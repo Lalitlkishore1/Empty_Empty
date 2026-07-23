@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<ruleset name="GalaxyOne">
+  <description>WordPress coding standards for GalaxyOne.</description>
+
+  <arg name="basepath" value="."/>
+  <arg name="colors"/>
+  <arg name="extensions" value="php,inc"/>
+  <arg value="sp"/>
+
+  <file>.</file>
+
+  <exclude-pattern>vendor/*</exclude-pattern>
+  <exclude-pattern>node_modules/*</exclude-pattern>
+  <exclude-pattern>.phpunit.cache/*</exclude-pattern>
+  <exclude-pattern>wp-content/uploads/*</exclude-pattern>
+  <exclude-pattern>wp-config.php</exclude-pattern>
+  <exclude-pattern>wp-config-local.php</exclude-pattern>
+
+  <rule ref="WordPress-Extra"/>
+</ruleset>
