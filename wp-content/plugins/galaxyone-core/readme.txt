@@ -6,7 +6,6 @@ Tested up to: 6.7
 Requires PHP: 8.1
 Stable tag: 0.1.0
 License: Proprietary
-License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
 Core business-logic foundation for GalaxyOne.
 
