@@ -1,0 +1,19 @@
+{
+  "name": "galaxyone/core",
+  "description": "Core business-logic foundation for GalaxyOne.",
+  "type": "wordpress-plugin",
+  "license": "proprietary",
+  "require": {
+    "php": "^8.1"
+  },
+  "autoload": {
+    "psr-4": {
+      "GalaxyOne\\Core\\": "app/"
+    }
+  },
+  "config": {
+    "sort-packages": true
+  },
+  "minimum-stability": "stable",
+  "prefer-stable": true
+}
