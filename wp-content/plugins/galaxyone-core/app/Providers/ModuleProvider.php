@@ -7,7 +7,10 @@
 
 namespace GalaxyOne\Core\Providers;
 
+use GalaxyOne\Core\ActivityLog\ActivityLogModule;
+use GalaxyOne\Core\Admin\AdminModule;
 use GalaxyOne\Core\Contracts\ModuleInterface;
+use GalaxyOne\Core\Settings\SettingsModule;
 
 final class ModuleProvider {
 
@@ -17,6 +20,10 @@ final class ModuleProvider {
 	 * @return array<int, ModuleInterface>
 	 */
 	public static function get_modules(): array {
-		return array();
+		return array(
+			new ActivityLogModule(),
+			new SettingsModule(),
+			new AdminModule(),
+		);
 	}
 }
