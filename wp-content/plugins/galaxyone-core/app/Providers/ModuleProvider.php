@@ -10,6 +10,8 @@ namespace GalaxyOne\Core\Providers;
 use GalaxyOne\Core\ActivityLog\ActivityLogModule;
 use GalaxyOne\Core\Admin\AdminModule;
 use GalaxyOne\Core\Contracts\ModuleInterface;
+use GalaxyOne\Core\Inventory\InventoryModule;
+use GalaxyOne\Core\Products\ProductsModule;
 use GalaxyOne\Core\Settings\SettingsModule;
 
 final class ModuleProvider {
@@ -24,6 +26,8 @@ final class ModuleProvider {
 			new ActivityLogModule(),
 			new SettingsModule(),
 			new AdminModule(),
+			new InventoryModule(),
+			new ProductsModule(),
 		);
 	}
 }
