@@ -8,6 +8,7 @@
 namespace GalaxyOne\Core\Settings;
 
 use GalaxyOne\Core\Contracts\ModuleInterface;
+use GalaxyOne\Core\Security\Capabilities;
 
 final class SettingsModule implements ModuleInterface {
 
@@ -20,6 +21,11 @@ final class SettingsModule implements ModuleInterface {
 		add_action(
 			'admin_init',
 			array( $this, 'register_settings' )
+		);
+
+		add_filter(
+			'option_page_capability_' . SettingsRepository::OPTION_GROUP,
+			array( $this, 'get_option_page_capability' )
 		);
 	}
 
@@ -39,5 +45,15 @@ final class SettingsModule implements ModuleInterface {
 				'show_in_rest'      => false,
 			)
 		);
+	}
+
+	/**
+	 * Returns the capability required to save GalaxyOne settings.
+	 *
+	 * @param string $capability Default Settings API capability.
+	 * @return string
+	 */
+	public function get_option_page_capability( string $capability ): string {
+		return Capabilities::get_manage_capability();
 	}
 }
