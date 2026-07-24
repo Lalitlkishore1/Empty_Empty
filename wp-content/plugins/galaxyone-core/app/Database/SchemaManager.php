@@ -8,6 +8,7 @@
 namespace GalaxyOne\Core\Database;
 
 use GalaxyOne\Core\Database\Migrations\CreateActivityLogTable;
+use GalaxyOne\Core\Database\Migrations\CreateFlowerDailyPricesTable;
 
 final class SchemaManager {
 
@@ -19,11 +20,18 @@ final class SchemaManager {
 	private const OPTION_NAME = 'galaxyone_core_schema_version';
 
 	/**
+	 * Schema version that introduced the activity-log table.
+	 *
+	 * @var string
+	 */
+	private const ACTIVITY_LOG_SCHEMA_VERSION = '0.3.0';
+
+	/**
 	 * Current database schema version.
 	 *
 	 * @var string
 	 */
-	private const CURRENT_SCHEMA_VERSION = '0.3.0';
+	private const CURRENT_SCHEMA_VERSION = '0.4.0';
 
 	/**
 	 * Initializes the schema during activation.
@@ -42,15 +50,23 @@ final class SchemaManager {
 	public static function maybe_upgrade(): void {
 		$installed_version = (string) get_option( self::OPTION_NAME, '0.0.0' );
 
-		if ( version_compare( $installed_version, self::CURRENT_SCHEMA_VERSION, '>=' ) ) {
+		if (
+			version_compare( $installed_version, self::ACTIVITY_LOG_SCHEMA_VERSION, '<' ) &&
+			! CreateActivityLogTable::up()
+		) {
 			return;
 		}
 
-		if ( ! CreateActivityLogTable::up() ) {
+		if (
+			version_compare( $installed_version, self::CURRENT_SCHEMA_VERSION, '<' ) &&
+			! CreateFlowerDailyPricesTable::up()
+		) {
 			return;
 		}
 
-		update_option( self::OPTION_NAME, self::CURRENT_SCHEMA_VERSION, false );
+		if ( version_compare( $installed_version, self::CURRENT_SCHEMA_VERSION, '<' ) ) {
+			update_option( self::OPTION_NAME, self::CURRENT_SCHEMA_VERSION, false );
+		}
 	}
 
 	/**
@@ -62,11 +78,12 @@ final class SchemaManager {
 	}
 
 	/**
-	 * Removes Phase 4 schema data during uninstall.
+	 * Removes GalaxyOne schema data during uninstall.
 	 *
 	 * @return void
 	 */
 	public static function uninstall(): void {
+		CreateFlowerDailyPricesTable::down();
 		CreateActivityLogTable::down();
 		delete_option( self::OPTION_NAME );
 	}
