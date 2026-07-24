@@ -12,6 +12,7 @@ use GalaxyOne\Core\Database\Migrations\CreateDeliveryCapacityTable;
 use GalaxyOne\Core\Database\Migrations\CreateDeliveryReservationsTable;
 use GalaxyOne\Core\Database\Migrations\CreateDeliveryRulesTable;
 use GalaxyOne\Core\Database\Migrations\CreateFlowerDailyPricesTable;
+use GalaxyOne\Core\Database\Migrations\CreateOfferCampaignsTable;
 
 final class SchemaManager {
 
@@ -37,11 +38,18 @@ final class SchemaManager {
 	private const FLOWER_PRICE_SCHEMA_VERSION = '0.4.0';
 
 	/**
+	 * Schema version that introduced delivery tables.
+	 *
+	 * @var string
+	 */
+	private const DELIVERY_SCHEMA_VERSION = '0.5.0';
+
+	/**
 	 * Current database schema version.
 	 *
 	 * @var string
 	 */
-	private const CURRENT_SCHEMA_VERSION = '0.5.0';
+	private const CURRENT_SCHEMA_VERSION = '0.6.0';
 
 	/**
 	 * Initializes the schema during activation.
@@ -74,7 +82,7 @@ final class SchemaManager {
 			return;
 		}
 
-		if ( version_compare( $installed_version, self::CURRENT_SCHEMA_VERSION, '<' ) ) {
+		if ( version_compare( $installed_version, self::DELIVERY_SCHEMA_VERSION, '<' ) ) {
 			if (
 				! CreateDeliveryRulesTable::up() ||
 				! CreateDeliveryCapacityTable::up() ||
@@ -82,7 +90,16 @@ final class SchemaManager {
 			) {
 				return;
 			}
+		}
 
+		if (
+			version_compare( $installed_version, self::CURRENT_SCHEMA_VERSION, '<' ) &&
+			! CreateOfferCampaignsTable::up()
+		) {
+			return;
+		}
+
+		if ( version_compare( $installed_version, self::CURRENT_SCHEMA_VERSION, '<' ) ) {
 			update_option( self::OPTION_NAME, self::CURRENT_SCHEMA_VERSION, false );
 		}
 	}
@@ -101,6 +118,7 @@ final class SchemaManager {
 	 * @return void
 	 */
 	public static function uninstall(): void {
+		CreateOfferCampaignsTable::down();
 		CreateDeliveryReservationsTable::down();
 		CreateDeliveryCapacityTable::down();
 		CreateDeliveryRulesTable::down();
