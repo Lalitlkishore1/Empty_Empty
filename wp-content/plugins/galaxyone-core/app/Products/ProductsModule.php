@@ -85,7 +85,10 @@ final class ProductsModule implements ModuleInterface {
 			return;
 		}
 
-		$is_available = InventoryService::is_water_available( $product_id );
+		$is_available = 'yes' === $product_object->get_meta(
+			InventoryService::WATER_AVAILABILITY_META_KEY,
+			true
+		);
 
 		require GALAXYONE_CORE_PATH . 'templates/admin/products/water-availability-field.php';
 	}
@@ -125,11 +128,11 @@ final class ProductsModule implements ModuleInterface {
 		ActivityLogRepository::record(
 			'water_availability_updated',
 			array(
-				'product_id' => $product_id,
+				'product_id'  => $product_id,
 				'is_available' => $old_value,
 			),
 			array(
-				'product_id' => $product_id,
+				'product_id'  => $product_id,
 				'is_available' => $new_value,
 			),
 			array(
