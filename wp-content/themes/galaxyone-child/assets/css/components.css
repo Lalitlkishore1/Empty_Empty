@@ -1,0 +1,183 @@
+.galaxyone-container {
+	width: min(calc(100% - var(--galaxy-content-padding) - var(--galaxy-content-padding)), var(--galaxy-content-width));
+	margin-inline: auto;
+}
+
+.galaxyone-section {
+	padding-block: var(--galaxy-space-7);
+}
+
+.galaxyone-section__header {
+	display: grid;
+	gap: var(--galaxy-space-2);
+	margin-bottom: var(--galaxy-space-5);
+}
+
+.galaxyone-title {
+	margin: 0;
+	color: var(--galaxy-color-text);
+	font-size: var(--galaxy-font-size-heading-medium);
+	line-height: var(--galaxy-line-height-tight);
+}
+
+.galaxyone-copy {
+	margin: 0;
+	color: var(--galaxy-color-text-muted);
+}
+
+.galaxyone-card {
+	display: flex;
+	flex-direction: column;
+	gap: var(--galaxy-space-4);
+	padding: var(--galaxy-space-4);
+	background: var(--galaxy-color-surface);
+	border: 1px solid var(--galaxy-color-border);
+	border-radius: var(--galaxy-radius-large);
+	box-shadow: var(--galaxy-shadow-small);
+}
+
+.galaxyone-card__title {
+	margin: 0;
+	color: var(--galaxy-color-text);
+	font-size: var(--galaxy-font-size-heading-small);
+	line-height: var(--galaxy-line-height-tight);
+}
+
+.galaxyone-button,
+.button,
+.wp-element-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: var(--galaxy-control-min-height);
+	padding: var(--galaxy-space-3) var(--galaxy-space-5);
+	border: 1px solid transparent;
+	border-radius: var(--galaxy-radius-medium);
+	background: var(--galaxy-color-primary);
+	color: #ffffff;
+	font: inherit;
+	font-weight: 700;
+	line-height: 1.2;
+	text-align: center;
+	text-decoration: none;
+	cursor: pointer;
+	transition: background-color var(--galaxy-transition-fast), border-color var(--galaxy-transition-fast), color var(--galaxy-transition-fast);
+}
+
+.galaxyone-button:hover,
+.button:hover,
+.wp-element-button:hover {
+	background: var(--galaxy-color-primary-strong);
+	color: #ffffff;
+}
+
+.galaxyone-button--secondary {
+	border-color: var(--galaxy-color-primary);
+	background: transparent;
+	color: var(--galaxy-color-primary);
+}
+
+.galaxyone-button--secondary:hover {
+	background: var(--galaxy-color-primary-soft);
+	color: var(--galaxy-color-primary-strong);
+}
+
+.galaxyone-badge {
+	display: inline-flex;
+	align-items: center;
+	width: fit-content;
+	min-height: 1.75rem;
+	padding-inline: var(--galaxy-space-3);
+	border-radius: var(--galaxy-radius-pill);
+	background: var(--galaxy-color-primary-soft);
+	color: var(--galaxy-color-primary-strong);
+	font-size: var(--galaxy-font-size-caption);
+	font-weight: 700;
+}
+
+.galaxyone-notice {
+	padding: var(--galaxy-space-4);
+	border: 1px solid var(--galaxy-color-border);
+	border-radius: var(--galaxy-radius-medium);
+	background: var(--galaxy-color-surface-muted);
+	color: var(--galaxy-color-text);
+}
+
+.galaxyone-notice--success {
+	border-color: var(--galaxy-color-success);
+	background: var(--galaxy-color-success-soft);
+	color: var(--galaxy-color-success);
+}
+
+.galaxyone-notice--warning {
+	border-color: var(--galaxy-color-warning);
+	background: var(--galaxy-color-warning-soft);
+	color: var(--galaxy-color-warning);
+}
+
+.galaxyone-notice--error {
+	border-color: var(--galaxy-color-danger);
+	background: var(--galaxy-color-danger-soft);
+	color: var(--galaxy-color-danger);
+}
+
+.galaxyone-field {
+	display: grid;
+	gap: var(--galaxy-space-2);
+}
+
+.galaxyone-field label {
+	color: var(--galaxy-color-text);
+	font-weight: 700;
+}
+
+.galaxyone-field input,
+.galaxyone-field select,
+.galaxyone-field textarea {
+	width: 100%;
+	min-height: var(--galaxy-control-min-height);
+	padding: var(--galaxy-space-3);
+	border: 1px solid var(--galaxy-color-border);
+	border-radius: var(--galaxy-radius-small);
+	background: var(--galaxy-color-surface);
+	color: var(--galaxy-color-text);
+	font: inherit;
+}
+
+.galaxyone-field textarea {
+	min-height: 7rem;
+	resize: vertical;
+}
+
+.galaxyone-field input:focus,
+.galaxyone-field select:focus,
+.galaxyone-field textarea:focus {
+	border-color: var(--galaxy-color-primary);
+}
+
+.screen-reader-text {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+.screen-reader-text:focus {
+	z-index: 100000;
+	top: var(--galaxy-space-2);
+	left: var(--galaxy-space-2);
+	width: auto;
+	height: auto;
+	padding: var(--galaxy-space-3);
+	margin: 0;
+	overflow: visible;
+	clip: auto;
+	background: var(--galaxy-color-surface);
+	color: var(--galaxy-color-text);
+	box-shadow: var(--galaxy-shadow-medium);
+}
