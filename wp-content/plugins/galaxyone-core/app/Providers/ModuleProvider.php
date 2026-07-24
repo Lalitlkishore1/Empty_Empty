@@ -12,6 +12,8 @@ use GalaxyOne\Core\Admin\AdminModule;
 use GalaxyOne\Core\Contracts\ModuleInterface;
 use GalaxyOne\Core\Delivery\DeliveryModule;
 use GalaxyOne\Core\Inventory\InventoryModule;
+use GalaxyOne\Core\Offers\OffersModule;
+use GalaxyOne\Core\Pricing\PricingModule;
 use GalaxyOne\Core\Products\ProductsModule;
 use GalaxyOne\Core\Settings\SettingsModule;
 
@@ -30,6 +32,8 @@ final class ModuleProvider {
 			new InventoryModule(),
 			new ProductsModule(),
 			new DeliveryModule(),
+			new PricingModule(),
+			new OffersModule(),
 		);
 	}
 }
