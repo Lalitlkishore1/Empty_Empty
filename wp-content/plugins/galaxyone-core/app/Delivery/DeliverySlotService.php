@@ -46,11 +46,16 @@ final class DeliverySlotService {
 	): bool {
 		global $wpdb;
 
-		$slot_key    = sanitize_title( $slot_key );
-		$label       = sanitize_text_field( $label );
-		$start_time  = self::normalize_time( $start_time );
-		$end_time    = self::normalize_time( $end_time );
-		$cutoff_time = '' === $cutoff_time ? '' : self::normalize_time( $cutoff_time );
+		$slot_key          = sanitize_title( $slot_key );
+		$label             = sanitize_text_field( $label );
+		$start_time        = self::normalize_time( $start_time );
+		$end_time          = self::normalize_time( $end_time );
+		$raw_cutoff_time   = trim( $cutoff_time );
+		$normalized_cutoff = '';
+
+		if ( '' !== $raw_cutoff_time ) {
+			$normalized_cutoff = self::normalize_time( $raw_cutoff_time );
+		}
 
 		if (
 			'' === $slot_key ||
@@ -59,7 +64,7 @@ final class DeliverySlotService {
 			$weekday > 6 ||
 			'' === $start_time ||
 			'' === $end_time ||
-			'' === $cutoff_time && '' !== trim( $cutoff_time )
+			( '' !== $raw_cutoff_time && '' === $normalized_cutoff )
 		) {
 			return false;
 		}
@@ -73,13 +78,13 @@ final class DeliverySlotService {
 		$query      = $wpdb->prepare(
 			"INSERT INTO {$table_name}
 				(rule_type, rule_key, label, weekday, start_time, end_time, cutoff_time, is_active, created_at, updated_at)
-			VALUES (%s, %s, %s, %d, %s, %s, %s, %d, %s, %s)
+			VALUES (%s, %s, %s, %d, %s, %s, NULLIF(%s, ''), %d, %s, %s)
 			ON DUPLICATE KEY UPDATE
 				label = %s,
 				weekday = %d,
 				start_time = %s,
 				end_time = %s,
-				cutoff_time = %s,
+				cutoff_time = NULLIF(%s, ''),
 				is_active = %d,
 				updated_at = %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			self::SLOT_RULE_TYPE,
@@ -88,7 +93,7 @@ final class DeliverySlotService {
 			$weekday,
 			$start_time,
 			$end_time,
-			$cutoff_time,
+			$normalized_cutoff,
 			1,
 			$now,
 			$now,
@@ -96,7 +101,7 @@ final class DeliverySlotService {
 			$weekday,
 			$start_time,
 			$end_time,
-			$cutoff_time,
+			$normalized_cutoff,
 			1,
 			$now
 		);
