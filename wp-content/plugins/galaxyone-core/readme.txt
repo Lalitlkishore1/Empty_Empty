@@ -4,7 +4,7 @@ Tags: ecommerce, woocommerce, local delivery
 Requires at least: 6.4
 Tested up to: 6.7
 Requires PHP: 8.1
-Stable tag: 0.1.0
+Stable tag: 0.2.0
 License: Proprietary
 
 Core business-logic foundation for GalaxyOne.
@@ -13,13 +13,14 @@ Core business-logic foundation for GalaxyOne.
 
 GalaxyOne Core provides the modular plugin foundation for the GalaxyOne local commerce platform.
 
-This Phase 2 release includes:
+This release includes:
 
 * Composer PSR-4 autoloading.
 * WooCommerce dependency validation.
 * Plugin lifecycle hooks.
 * Schema-version tracking.
-* Shared module, validation, capability, notice, and logging foundations.
+* Secure administration settings framework.
+* Administrator activity logging.
 
 No product, pricing, delivery, checkout, reward, customer, notification, dashboard, or presentation functionality is included in this release.
 
@@ -31,6 +32,9 @@ No product, pricing, delivery, checkout, reward, customer, notification, dashboa
 4. Activate GalaxyOne Core.
 
 == Changelog ==
+
+= 0.2.0 =
+* Added the administration settings and activity-log foundation.
 
 = 0.1.0 =
 * Added the Phase 2 plugin foundation.
