@@ -1,3 +1,4 @@
+```php
 <?php
 /**
  * Schema version manager.
@@ -23,7 +24,7 @@ final class SchemaManager {
 	 *
 	 * @var string
 	 */
-	private const CURRENT_SCHEMA_VERSION = '0.2.0';
+	private const CURRENT_SCHEMA_VERSION = '0.3.0';
 
 	/**
 	 * Initializes the schema during activation.
@@ -71,3 +72,4 @@ final class SchemaManager {
 		delete_option( self::OPTION_NAME );
 	}
 }
+```
