@@ -9,8 +9,10 @@ defined( 'WP_UNINSTALL_PLUGIN' ) || exit;
 
 global $wpdb;
 
-$galaxyone_activity_log_table = $wpdb->prefix . 'galaxy_activity_logs';
+$galaxyone_activity_log_table    = $wpdb->prefix . 'galaxy_activity_logs';
+$galaxyone_flower_daily_price_table = $wpdb->prefix . 'galaxy_flower_daily_prices';
 
+$wpdb->query( "DROP TABLE IF EXISTS {$galaxyone_flower_daily_price_table}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 $wpdb->query( "DROP TABLE IF EXISTS {$galaxyone_activity_log_table}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
 delete_option( 'galaxyone_core_schema_version' );
