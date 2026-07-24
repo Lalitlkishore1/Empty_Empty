@@ -1,4 +1,3 @@
-```php
 <?php
 /**
  * Schema version manager.
@@ -72,4 +71,3 @@ final class SchemaManager {
 		delete_option( self::OPTION_NAME );
 	}
 }
-```
