@@ -7,6 +7,8 @@
 
 namespace GalaxyOne\Core\Database;
 
+use GalaxyOne\Core\Database\Migrations\CreateActivityLogTable;
+
 final class SchemaManager {
 
 	/**
@@ -17,7 +19,14 @@ final class SchemaManager {
 	private const OPTION_NAME = 'galaxyone_core_schema_version';
 
 	/**
-	 * Initializes the schema-version record during activation.
+	 * Current database schema version.
+	 *
+	 * @var string
+	 */
+	private const CURRENT_SCHEMA_VERSION = '0.2.0';
+
+	/**
+	 * Initializes the schema during activation.
 	 *
 	 * @return void
 	 */
@@ -26,16 +35,22 @@ final class SchemaManager {
 	}
 
 	/**
-	 * Updates the schema-version record when the plugin version changes.
+	 * Runs pending schema migrations.
 	 *
 	 * @return void
 	 */
 	public static function maybe_upgrade(): void {
 		$installed_version = (string) get_option( self::OPTION_NAME, '0.0.0' );
 
-		if ( version_compare( $installed_version, GALAXYONE_CORE_VERSION, '<' ) ) {
-			update_option( self::OPTION_NAME, GALAXYONE_CORE_VERSION, false );
+		if ( version_compare( $installed_version, self::CURRENT_SCHEMA_VERSION, '>=' ) ) {
+			return;
 		}
+
+		if ( ! CreateActivityLogTable::up() ) {
+			return;
+		}
+
+		update_option( self::OPTION_NAME, self::CURRENT_SCHEMA_VERSION, false );
 	}
 
 	/**
@@ -47,11 +62,12 @@ final class SchemaManager {
 	}
 
 	/**
-	 * Removes the Phase 2 schema-version record during uninstall.
+	 * Removes Phase 4 schema data during uninstall.
 	 *
 	 * @return void
 	 */
 	public static function uninstall(): void {
+		CreateActivityLogTable::down();
 		delete_option( self::OPTION_NAME );
 	}
 }
