@@ -1,0 +1,58 @@
+/**
+ * Theme Name: GalaxyOne Child
+ * Description: Mobile-first presentation layer for GalaxyOne.
+ * Template: hello-elementor
+ * Version: 0.1.0
+ * Requires at least: 6.4
+ * Requires PHP: 8.1
+ * Text Domain: galaxyone-child
+ */
+
+html {
+	background: var(--galaxy-color-surface-muted);
+}
+
+body {
+	margin: 0;
+	background: var(--galaxy-color-surface);
+	color: var(--galaxy-color-text);
+	font-family: var(--galaxy-font-sans);
+	font-size: var(--galaxy-font-size-body);
+	line-height: var(--galaxy-line-height-body);
+	text-rendering: optimizeLegibility;
+}
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+img {
+	display: block;
+	max-width: 100%;
+	height: auto;
+}
+
+a {
+	color: var(--galaxy-color-primary);
+	text-decoration-thickness: 0.08em;
+	text-underline-offset: 0.16em;
+}
+
+a:hover {
+	color: var(--galaxy-color-primary-strong);
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+	outline: var(--galaxy-focus-outline);
+	outline-offset: var(--galaxy-focus-offset);
+}
+
+.galaxyone-no-js .galaxyone-js-only {
+	display: none;
+}
