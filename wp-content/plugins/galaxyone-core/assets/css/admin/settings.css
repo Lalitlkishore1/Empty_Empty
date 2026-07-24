@@ -1,0 +1,23 @@
+.galaxyone-admin {
+	max-width: 80rem;
+}
+
+.galaxyone-admin .form-table th {
+	width: 14rem;
+}
+
+.galaxyone-admin__activity-log {
+	margin-top: 2rem;
+}
+
+.galaxyone-admin__table-wrapper {
+	overflow-x: auto;
+}
+
+.galaxyone-admin__activity-log code {
+	display: block;
+	max-width: 22rem;
+	overflow: auto;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
