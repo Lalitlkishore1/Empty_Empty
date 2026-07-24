@@ -43,6 +43,13 @@ final class DeliveryModule implements ModuleInterface {
 	private const ADMIN_NONCE_FIELD = 'galaxyone_delivery_nonce';
 
 	/**
+	 * Scheduled reservation-cleanup action.
+	 *
+	 * @var string
+	 */
+	private const RESERVATION_CLEANUP_HOOK = 'galaxyone_release_expired_delivery_reservations';
+
+	/**
 	 * Registers the module with WordPress.
 	 *
 	 * @return void
@@ -59,9 +66,36 @@ final class DeliveryModule implements ModuleInterface {
 			array( $this, 'save_configuration' )
 		);
 
+		add_action(
+			'init',
+			array( $this, 'schedule_reservation_cleanup' )
+		);
+
+		add_action(
+			self::RESERVATION_CLEANUP_HOOK,
+			array( DeliveryReservationService::class, 'release_expired' )
+		);
+
 		add_shortcode(
 			'galaxyone_delivery_check',
 			array( $this, 'render_serviceability_check' )
+		);
+	}
+
+	/**
+	 * Schedules regular expired-reservation cleanup.
+	 *
+	 * @return void
+	 */
+	public function schedule_reservation_cleanup(): void {
+		if ( wp_next_scheduled( self::RESERVATION_CLEANUP_HOOK ) ) {
+			return;
+		}
+
+		wp_schedule_event(
+			time() + HOUR_IN_SECONDS,
+			'hourly',
+			self::RESERVATION_CLEANUP_HOOK
 		);
 	}
 
