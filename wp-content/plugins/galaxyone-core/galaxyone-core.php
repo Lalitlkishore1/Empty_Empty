@@ -2,7 +2,7 @@
 /**
  * Plugin Name: GalaxyOne Core
  * Description: Core business-logic foundation for GalaxyOne.
- * Version: 0.1.0
+ * Version: 0.2.0
  * Requires at least: 6.4
  * Requires PHP: 8.1
  * Author: GalaxyOne
@@ -13,7 +13,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'GALAXYONE_CORE_VERSION', '0.1.0' );
+define( 'GALAXYONE_CORE_VERSION', '0.2.0' );
 define( 'GALAXYONE_CORE_FILE', __FILE__ );
 define( 'GALAXYONE_CORE_PATH', plugin_dir_path( __FILE__ ) );
 
