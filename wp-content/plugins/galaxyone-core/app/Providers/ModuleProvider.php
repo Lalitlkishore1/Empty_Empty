@@ -9,6 +9,8 @@ namespace GalaxyOne\Core\Providers;
 
 use GalaxyOne\Core\ActivityLog\ActivityLogModule;
 use GalaxyOne\Core\Admin\AdminModule;
+use GalaxyOne\Core\Cart\CartModule;
+use GalaxyOne\Core\Checkout\CheckoutModule;
 use GalaxyOne\Core\Contracts\ModuleInterface;
 use GalaxyOne\Core\Delivery\DeliveryModule;
 use GalaxyOne\Core\Frontend\FrontendModule;
@@ -36,6 +38,8 @@ final class ModuleProvider {
 			new PricingModule(),
 			new OffersModule(),
 			new FrontendModule(),
+			new CartModule(),
+			new CheckoutModule(),
 		);
 	}
 }
