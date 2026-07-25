@@ -13,6 +13,8 @@ use GalaxyOne\Core\Database\Migrations\CreateDeliveryReservationsTable;
 use GalaxyOne\Core\Database\Migrations\CreateDeliveryRulesTable;
 use GalaxyOne\Core\Database\Migrations\CreateFlowerDailyPricesTable;
 use GalaxyOne\Core\Database\Migrations\CreateOfferCampaignsTable;
+use GalaxyOne\Core\Database\Migrations\CreateRewardCampaignsTable;
+use GalaxyOne\Core\Database\Migrations\CreateRewardEventsTable;
 
 final class SchemaManager {
 
@@ -45,11 +47,18 @@ final class SchemaManager {
 	private const DELIVERY_SCHEMA_VERSION = '0.5.0';
 
 	/**
+	 * Schema version that introduced offer campaigns.
+	 *
+	 * @var string
+	 */
+	private const OFFER_SCHEMA_VERSION = '0.6.0';
+
+	/**
 	 * Current database schema version.
 	 *
 	 * @var string
 	 */
-	private const CURRENT_SCHEMA_VERSION = '0.6.0';
+	private const CURRENT_SCHEMA_VERSION = '0.7.0';
 
 	/**
 	 * Initializes the schema during activation.
@@ -93,10 +102,19 @@ final class SchemaManager {
 		}
 
 		if (
-			version_compare( $installed_version, self::CURRENT_SCHEMA_VERSION, '<' ) &&
+			version_compare( $installed_version, self::OFFER_SCHEMA_VERSION, '<' ) &&
 			! CreateOfferCampaignsTable::up()
 		) {
 			return;
+		}
+
+		if ( version_compare( $installed_version, self::CURRENT_SCHEMA_VERSION, '<' ) ) {
+			if (
+				! CreateRewardCampaignsTable::up() ||
+				! CreateRewardEventsTable::up()
+			) {
+				return;
+			}
 		}
 
 		if ( version_compare( $installed_version, self::CURRENT_SCHEMA_VERSION, '<' ) ) {
@@ -118,6 +136,8 @@ final class SchemaManager {
 	 * @return void
 	 */
 	public static function uninstall(): void {
+		CreateRewardEventsTable::down();
+		CreateRewardCampaignsTable::down();
 		CreateOfferCampaignsTable::down();
 		CreateDeliveryReservationsTable::down();
 		CreateDeliveryCapacityTable::down();
