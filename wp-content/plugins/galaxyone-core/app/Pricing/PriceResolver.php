@@ -17,7 +17,7 @@ final class PriceResolver {
 	 * Resolves the current server-side selling price for a product.
 	 *
 	 * A rewarded offer is accepted only as a server-created, verified context.
-	 * No request handler in this phase accepts rewarded-offer data from a browser.
+	 * No request handler accepts rewarded-offer data from a browser.
 	 *
 	 * @param int                       $product_id     WooCommerce product or variation ID.
 	 * @param array<string, mixed>|null $rewarded_offer Trusted rewarded-offer context.
@@ -32,11 +32,12 @@ final class PriceResolver {
 		}
 
 		$resolved = array(
-			'product_id'   => $catalog_product_id,
-			'normal_price' => $normal_price,
-			'price'        => $normal_price,
-			'source'       => 'normal',
-			'campaign_key' => '',
+			'product_id'        => $catalog_product_id,
+			'normal_price'      => $normal_price,
+			'price'             => $normal_price,
+			'source'            => 'normal',
+			'campaign_key'      => '',
+			'reward_event_token' => '',
 		);
 
 		$scheduled_offer = OfferEligibilityService::get_scheduled_product_offer(
@@ -57,9 +58,10 @@ final class PriceResolver {
 		);
 
 		if ( is_array( $rewarded_price ) ) {
-			$resolved['price']        = $rewarded_price['price'];
-			$resolved['source']       = 'rewarded_offer';
-			$resolved['campaign_key'] = $rewarded_price['campaign_key'];
+			$resolved['price']              = $rewarded_price['price'];
+			$resolved['source']             = 'rewarded_offer';
+			$resolved['campaign_key']       = $rewarded_price['campaign_key'];
+			$resolved['reward_event_token'] = $rewarded_price['event_token'];
 		}
 
 		return $resolved;
@@ -115,9 +117,10 @@ final class PriceResolver {
 		if (
 			! is_array( $rewarded_offer ) ||
 			empty( $rewarded_offer['is_verified'] ) ||
-			! isset( $rewarded_offer['product_id'], $rewarded_offer['price'] ) ||
+			! isset( $rewarded_offer['product_id'], $rewarded_offer['price'], $rewarded_offer['event_token'] ) ||
 			! is_scalar( $rewarded_offer['product_id'] ) ||
-			! is_scalar( $rewarded_offer['price'] )
+			! is_scalar( $rewarded_offer['price'] ) ||
+			! is_scalar( $rewarded_offer['event_token'] )
 		) {
 			return null;
 		}
@@ -128,10 +131,12 @@ final class PriceResolver {
 		$rewarded_price      = DailyFlowerPriceRepository::normalize_price(
 			$rewarded_offer['price']
 		);
+		$event_token         = sanitize_text_field( (string) $rewarded_offer['event_token'] );
 
 		if (
 			$product_id !== $rewarded_product_id ||
 			null === $rewarded_price ||
+			! wp_is_uuid( $event_token ) ||
 			! self::is_lower_price( $rewarded_price, $normal_price )
 		) {
 			return null;
@@ -148,6 +153,7 @@ final class PriceResolver {
 		return array(
 			'price'        => $rewarded_price,
 			'campaign_key' => $campaign_key,
+			'event_token'  => $event_token,
 		);
 	}
 
