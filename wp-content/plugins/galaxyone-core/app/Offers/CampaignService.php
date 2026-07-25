@@ -336,6 +336,10 @@ final class CampaignService {
 
 		if ( 0 !== $product_id ) {
 			$product_id = ProductCategoryResolver::get_catalog_product_id( $product_id );
+
+			if ( 0 === $product_id ) {
+				return null;
+			}
 		}
 
 		if (
