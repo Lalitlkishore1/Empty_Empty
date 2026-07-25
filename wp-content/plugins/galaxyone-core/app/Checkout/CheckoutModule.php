@@ -149,12 +149,15 @@ final class CheckoutModule implements ModuleInterface {
 		$postcode = isset( $data['billing_postcode'] ) && is_scalar( $data['billing_postcode'] )
 			? (string) $data['billing_postcode']
 			: '';
-		$date     = isset( $data['galaxyone_delivery_date'] ) && is_scalar( $data['galaxyone_delivery_date'] )
-			? (string) $data['galaxyone_delivery_date']
+		$date     = isset( $_POST['galaxyone_delivery_date'] ) && is_string( $_POST['galaxyone_delivery_date'] ) // phpcs:ignore WordPress.Security.NonceVerification.Missing
+			? sanitize_text_field( wp_unslash( $_POST['galaxyone_delivery_date'] ) ) // phpcs:ignore WordPress.Security.NonceVerification.Missing
 			: '';
-		$slot_key = isset( $data['galaxyone_delivery_slot'] ) && is_scalar( $data['galaxyone_delivery_slot'] )
-			? (string) $data['galaxyone_delivery_slot']
+		$slot_key = isset( $_POST['galaxyone_delivery_slot'] ) && is_string( $_POST['galaxyone_delivery_slot'] ) // phpcs:ignore WordPress.Security.NonceVerification.Missing
+			? sanitize_title( wp_unslash( $_POST['galaxyone_delivery_slot'] ) ) // phpcs:ignore WordPress.Security.NonceVerification.Missing
 			: '';
+
+		$data['galaxyone_delivery_date'] = $date;
+		$data['galaxyone_delivery_slot'] = $slot_key;
 
 		CartRecalculationService::update_delivery_selection( $postcode, $date, $slot_key );
 
@@ -203,8 +206,8 @@ final class CheckoutModule implements ModuleInterface {
 	/**
 	 * Persists final checkout metadata on the order.
 	 *
-	 * @param WC_Order              $order WooCommerce order.
-	 * @param array<string, mixed>  $data  Validated checkout data.
+	 * @param WC_Order             $order WooCommerce order.
+	 * @param array<string, mixed> $data  Validated checkout data.
 	 * @return void
 	 */
 	public function store_order_metadata( WC_Order $order, array $data ): void {
