@@ -40,15 +40,18 @@ final class OrderMetaService {
 			'_galaxyone_price_snapshot',
 			wp_json_encode(
 				array(
-					'product_id'   => isset( $snapshot['product_id'] ) ? absint( $snapshot['product_id'] ) : 0,
-					'normal_price' => isset( $snapshot['normal_price'] ) ? (string) $snapshot['normal_price'] : '',
-					'price'        => isset( $snapshot['price'] ) ? (string) $snapshot['price'] : '',
-					'source'       => isset( $snapshot['source'] ) ? sanitize_key( (string) $snapshot['source'] ) : '',
-					'campaign_key' => isset( $snapshot['campaign_key'] )
+					'product_id'         => isset( $snapshot['product_id'] ) ? absint( $snapshot['product_id'] ) : 0,
+					'normal_price'       => isset( $snapshot['normal_price'] ) ? (string) $snapshot['normal_price'] : '',
+					'price'              => isset( $snapshot['price'] ) ? (string) $snapshot['price'] : '',
+					'source'             => isset( $snapshot['source'] ) ? sanitize_key( (string) $snapshot['source'] ) : '',
+					'campaign_key'       => isset( $snapshot['campaign_key'] )
 						? sanitize_title( (string) $snapshot['campaign_key'] )
 						: '',
-					'currency'     => isset( $snapshot['currency'] ) ? sanitize_text_field( (string) $snapshot['currency'] ) : '',
-					'resolved_at'  => isset( $snapshot['resolved_at'] ) ? sanitize_text_field( (string) $snapshot['resolved_at'] ) : '',
+					'reward_event_token' => isset( $snapshot['reward_event_token'] ) && wp_is_uuid( (string) $snapshot['reward_event_token'] )
+						? (string) $snapshot['reward_event_token']
+						: '',
+					'currency'           => isset( $snapshot['currency'] ) ? sanitize_text_field( (string) $snapshot['currency'] ) : '',
+					'resolved_at'        => isset( $snapshot['resolved_at'] ) ? sanitize_text_field( (string) $snapshot['resolved_at'] ) : '',
 				)
 			),
 			true
@@ -63,47 +66,29 @@ final class OrderMetaService {
 	 * @return void
 	 */
 	public static function store_checkout_metadata( WC_Order $order, array $data ): void {
-		$selection = CartRecalculationService::get_delivery_selection();
-		$fee       = CartRecalculationService::get_delivery_fee_snapshot();
-		$slot      = DeliverySlotService::get_slot( (string) $selection['slot_key'] );
-		$area      = ServiceAreaService::get_service_area( (string) $selection['postcode'] );
+		$selection   = CartRecalculationService::get_delivery_selection();
+		$fee         = CartRecalculationService::get_delivery_fee_snapshot();
+		$slot        = DeliverySlotService::get_slot( (string) $selection['slot_key'] );
+		$area        = ServiceAreaService::get_service_area( (string) $selection['postcode'] );
 		$reservation = CartRecalculationService::get_delivery_reservation();
 		$landmark    = isset( $data['galaxyone_landmark'] ) && is_scalar( $data['galaxyone_landmark'] )
 			? sanitize_text_field( (string) $data['galaxyone_landmark'] )
 			: '';
 
-		$order->update_meta_data(
-			'_galaxyone_delivery_date',
-			sanitize_text_field( (string) $selection['delivery_date'] )
-		);
-		$order->update_meta_data(
-			'_galaxyone_delivery_slot_key',
-			sanitize_title( (string) $selection['slot_key'] )
-		);
+		$order->update_meta_data( '_galaxyone_delivery_date', sanitize_text_field( (string) $selection['delivery_date'] ) );
+		$order->update_meta_data( '_galaxyone_delivery_slot_key', sanitize_title( (string) $selection['slot_key'] ) );
 		$order->update_meta_data(
 			'_galaxyone_delivery_slot_label',
 			is_array( $slot ) ? sanitize_text_field( (string) $slot['label'] ) : ''
 		);
-		$order->update_meta_data(
-			'_galaxyone_delivery_postcode',
-			sanitize_text_field( (string) $selection['postcode'] )
-		);
+		$order->update_meta_data( '_galaxyone_delivery_postcode', sanitize_text_field( (string) $selection['postcode'] ) );
 		$order->update_meta_data(
 			'_galaxyone_delivery_service_area',
 			is_array( $area ) ? sanitize_text_field( (string) $area['label'] ) : ''
 		);
-		$order->update_meta_data(
-			'_galaxyone_delivery_fee',
-			(string) $fee['applied_fee']
-		);
-		$order->update_meta_data(
-			'_galaxyone_delivery_normal_fee',
-			(string) $fee['normal_fee']
-		);
-		$order->update_meta_data(
-			'_galaxyone_free_delivery_campaign_key',
-			sanitize_title( (string) $fee['campaign_key'] )
-		);
+		$order->update_meta_data( '_galaxyone_delivery_fee', (string) $fee['applied_fee'] );
+		$order->update_meta_data( '_galaxyone_delivery_normal_fee', (string) $fee['normal_fee'] );
+		$order->update_meta_data( '_galaxyone_free_delivery_campaign_key', sanitize_title( (string) $fee['campaign_key'] ) );
 		$order->update_meta_data(
 			'_galaxyone_delivery_reservation_token',
 			isset( $reservation['token'] ) && is_scalar( $reservation['token'] )
