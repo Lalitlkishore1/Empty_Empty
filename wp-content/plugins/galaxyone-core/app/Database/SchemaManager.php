@@ -12,6 +12,7 @@ use GalaxyOne\Core\Database\Migrations\CreateDeliveryCapacityTable;
 use GalaxyOne\Core\Database\Migrations\CreateDeliveryReservationsTable;
 use GalaxyOne\Core\Database\Migrations\CreateDeliveryRulesTable;
 use GalaxyOne\Core\Database\Migrations\CreateFlowerDailyPricesTable;
+use GalaxyOne\Core\Database\Migrations\CreateNotificationLogTable;
 use GalaxyOne\Core\Database\Migrations\CreateOfferCampaignsTable;
 use GalaxyOne\Core\Database\Migrations\CreateRewardCampaignsTable;
 use GalaxyOne\Core\Database\Migrations\CreateRewardEventsTable;
@@ -54,11 +55,25 @@ final class SchemaManager {
 	private const OFFER_SCHEMA_VERSION = '0.6.0';
 
 	/**
+	 * Schema version that introduced rewarded-offer tables.
+	 *
+	 * @var string
+	 */
+	private const REWARD_SCHEMA_VERSION = '0.7.0';
+
+	/**
+	 * Schema version that introduced notification-delivery logs.
+	 *
+	 * @var string
+	 */
+	private const NOTIFICATION_SCHEMA_VERSION = '0.8.0';
+
+	/**
 	 * Current database schema version.
 	 *
 	 * @var string
 	 */
-	private const CURRENT_SCHEMA_VERSION = '0.7.0';
+	private const CURRENT_SCHEMA_VERSION = self::NOTIFICATION_SCHEMA_VERSION;
 
 	/**
 	 * Initializes the schema during activation.
@@ -108,13 +123,20 @@ final class SchemaManager {
 			return;
 		}
 
-		if ( version_compare( $installed_version, self::CURRENT_SCHEMA_VERSION, '<' ) ) {
+		if ( version_compare( $installed_version, self::REWARD_SCHEMA_VERSION, '<' ) ) {
 			if (
 				! CreateRewardCampaignsTable::up() ||
 				! CreateRewardEventsTable::up()
 			) {
 				return;
 			}
+		}
+
+		if (
+			version_compare( $installed_version, self::NOTIFICATION_SCHEMA_VERSION, '<' ) &&
+			! CreateNotificationLogTable::up()
+		) {
+			return;
 		}
 
 		if ( version_compare( $installed_version, self::CURRENT_SCHEMA_VERSION, '<' ) ) {
@@ -136,6 +158,7 @@ final class SchemaManager {
 	 * @return void
 	 */
 	public static function uninstall(): void {
+		CreateNotificationLogTable::down();
 		CreateRewardEventsTable::down();
 		CreateRewardCampaignsTable::down();
 		CreateOfferCampaignsTable::down();
