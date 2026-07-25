@@ -19,6 +19,13 @@ final class DeliveryReservationService {
 	private const ACTIVE_STATUS = 'active';
 
 	/**
+	 * Confirmed order reservation status.
+	 *
+	 * @var string
+	 */
+	private const CONFIRMED_STATUS = 'confirmed';
+
+	/**
 	 * Reservation lifetime in seconds.
 	 *
 	 * @var int
@@ -96,7 +103,44 @@ final class DeliveryReservationService {
 	}
 
 	/**
-	 * Releases an active reservation exactly once.
+	 * Binds an active reservation to a successfully created order.
+	 *
+	 * Confirmed reservations remain counted against delivery capacity until
+	 * the associated order is cancelled or fails.
+	 *
+	 * @param string $reservation_token Reservation token.
+	 * @param int    $order_id          WooCommerce order ID.
+	 * @return bool
+	 */
+	public static function assign_to_order( string $reservation_token, int $order_id ): bool {
+		global $wpdb;
+
+		if ( ! wp_is_uuid( $reservation_token ) || $order_id <= 0 ) {
+			return false;
+		}
+
+		$table_name = CreateDeliveryReservationsTable::get_table_name();
+		$updated    = $wpdb->query(
+			$wpdb->prepare(
+				"UPDATE {$table_name}
+				SET order_id = %d,
+					status = %s,
+					expires_at = %s
+				WHERE reservation_token = %s
+					AND status = %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$order_id,
+				self::CONFIRMED_STATUS,
+				current_time( 'mysql', true ),
+				$reservation_token,
+				self::ACTIVE_STATUS
+			)
+		); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+
+		return 1 === $updated;
+	}
+
+	/**
+	 * Releases an active or confirmed reservation exactly once.
 	 *
 	 * @param string $reservation_token Reservation token.
 	 * @param string $status            Final status.
@@ -106,7 +150,7 @@ final class DeliveryReservationService {
 		global $wpdb;
 
 		if (
-			! in_array( $status, array( 'released', 'cancelled', 'expired' ), true ) ||
+			! in_array( $status, array( 'released', 'cancelled', 'expired', 'failed' ), true ) ||
 			! wp_is_uuid( $reservation_token )
 		) {
 			return false;
@@ -118,10 +162,11 @@ final class DeliveryReservationService {
 				"SELECT delivery_date, slot_key, quantity
 				FROM {$table_name}
 				WHERE reservation_token = %s
-					AND status = %s
+					AND status IN (%s, %s)
 				LIMIT 1", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 				$reservation_token,
-				self::ACTIVE_STATUS
+				self::ACTIVE_STATUS,
+				self::CONFIRMED_STATUS
 			),
 			ARRAY_A
 		);
@@ -136,11 +181,12 @@ final class DeliveryReservationService {
 				SET status = %s,
 					released_at = %s
 				WHERE reservation_token = %s
-					AND status = %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+					AND status IN (%s, %s)", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 				$status,
 				current_time( 'mysql', true ),
 				$reservation_token,
-				self::ACTIVE_STATUS
+				self::ACTIVE_STATUS,
+				self::CONFIRMED_STATUS
 			)
 		); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 
