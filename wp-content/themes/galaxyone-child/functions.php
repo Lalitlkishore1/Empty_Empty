@@ -66,6 +66,13 @@ function galaxyone_child_enqueue_assets(): void {
 		$theme_version
 	);
 
+	wp_enqueue_style(
+		'galaxyone-child-storefront',
+		get_stylesheet_directory_uri() . '/assets/css/storefront.css',
+		array( 'galaxyone-child' ),
+		$theme_version
+	);
+
 	wp_enqueue_script(
 		'galaxyone-child-frontend',
 		get_stylesheet_directory_uri() . '/assets/js/frontend.js',
