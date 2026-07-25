@@ -27,13 +27,14 @@ final class PriceSnapshotService {
 		}
 
 		return array(
-			'product_id'   => (int) $resolved_price['product_id'],
-			'normal_price' => (string) $resolved_price['normal_price'],
-			'price'        => (string) $resolved_price['price'],
-			'source'       => (string) $resolved_price['source'],
-			'campaign_key' => (string) $resolved_price['campaign_key'],
-			'currency'     => get_woocommerce_currency(),
-			'resolved_at'  => current_time( 'mysql', true ),
+			'product_id'         => (int) $resolved_price['product_id'],
+			'normal_price'       => (string) $resolved_price['normal_price'],
+			'price'              => (string) $resolved_price['price'],
+			'source'             => (string) $resolved_price['source'],
+			'campaign_key'       => (string) $resolved_price['campaign_key'],
+			'reward_event_token' => (string) $resolved_price['reward_event_token'],
+			'currency'           => get_woocommerce_currency(),
+			'resolved_at'        => current_time( 'mysql', true ),
 		);
 	}
 }
