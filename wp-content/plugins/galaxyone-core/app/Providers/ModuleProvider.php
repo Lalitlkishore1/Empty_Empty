@@ -18,6 +18,7 @@ use GalaxyOne\Core\Inventory\InventoryModule;
 use GalaxyOne\Core\Offers\OffersModule;
 use GalaxyOne\Core\Pricing\PricingModule;
 use GalaxyOne\Core\Products\ProductsModule;
+use GalaxyOne\Core\RewardedAds\RewardedAdsModule;
 use GalaxyOne\Core\Settings\SettingsModule;
 
 final class ModuleProvider {
@@ -40,6 +41,7 @@ final class ModuleProvider {
 			new FrontendModule(),
 			new CartModule(),
 			new CheckoutModule(),
+			new RewardedAdsModule(),
 		);
 	}
 }
