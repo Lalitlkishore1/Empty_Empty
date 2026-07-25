@@ -11,6 +11,7 @@ use DateTimeImmutable;
 use DateTimeZone;
 use GalaxyOne\Core\Database\Migrations\CreateOfferCampaignsTable;
 use GalaxyOne\Core\Pricing\DailyFlowerPriceRepository;
+use GalaxyOne\Core\Products\ProductCategoryResolver;
 use WC_Product;
 
 final class CampaignService {
@@ -310,10 +311,10 @@ final class CampaignService {
 	 * @return array<string, int|string>|null
 	 */
 	private static function normalize_campaign( array $campaign ): ?array {
-		$campaign_key = isset( $campaign['campaign_key'] ) && is_scalar( $campaign['campaign_key'] )
+		$campaign_key  = isset( $campaign['campaign_key'] ) && is_scalar( $campaign['campaign_key'] )
 			? sanitize_title( (string) $campaign['campaign_key'] )
 			: '';
-		$name         = isset( $campaign['name'] ) && is_scalar( $campaign['name'] )
+		$name          = isset( $campaign['name'] ) && is_scalar( $campaign['name'] )
 			? sanitize_text_field( (string) $campaign['name'] )
 			: '';
 		$campaign_type = isset( $campaign['campaign_type'] ) && is_scalar( $campaign['campaign_type'] )
@@ -332,6 +333,10 @@ final class CampaignService {
 		$raw_ends_at   = isset( $campaign['ends_at'] ) && is_scalar( $campaign['ends_at'] )
 			? trim( (string) $campaign['ends_at'] )
 			: '';
+
+		if ( 0 !== $product_id ) {
+			$product_id = ProductCategoryResolver::get_catalog_product_id( $product_id );
+		}
 
 		if (
 			'' === $campaign_key ||
