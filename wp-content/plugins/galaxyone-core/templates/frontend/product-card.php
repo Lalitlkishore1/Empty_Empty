@@ -28,7 +28,7 @@ $product_status_id  = 'galaxyone-product-status-' . (int) $card['product_id'];
 			</a>
 		</h3>
 
-		<?php if ( ! empty( $card['is_available'] ) && ! empty( $card['has_price'] ) : ?>
+		<?php if ( ! empty( $card['has_price'] ) ) : ?>
 			<div class="galaxyone-product-card__price" aria-label="<?php esc_attr_e( 'Current product price', 'galaxyone-core' ); ?>">
 				<?php if ( ! empty( $card['has_offer'] ) ) : ?>
 					<span class="galaxyone-product-card__normal-price">
@@ -44,11 +44,13 @@ $product_status_id  = 'galaxyone-product-status-' . (int) $card['product_id'];
 					</span>
 				<?php endif; ?>
 			</div>
-		<?php elseif ( ! empty( $card['is_available'] ) ) : ?>
-			<p id="<?php echo esc_attr( $product_status_id ); ?>" class="galaxyone-product-card__status galaxyone-product-card__status--warning" role="status">
+		<?php else : ?>
+			<p class="galaxyone-product-card__status galaxyone-product-card__status--warning" role="status">
 				<?php esc_html_e( 'Current price is unavailable.', 'galaxyone-core' ); ?>
 			</p>
-		<?php else : ?>
+		<?php endif; ?>
+
+		<?php if ( empty( $card['is_available'] ) ) : ?>
 			<p id="<?php echo esc_attr( $product_status_id ); ?>" class="galaxyone-product-card__status galaxyone-product-card__status--unavailable" role="status">
 				<?php esc_html_e( 'Currently unavailable', 'galaxyone-core' ); ?>
 			</p>
@@ -59,7 +61,7 @@ $product_status_id  = 'galaxyone-product-status-' . (int) $card['product_id'];
 		</p>
 
 		<div class="galaxyone-product-card__actions">
-			<?php if ( ! empty( $card['is_available'] ) && ! empty( $card['has_add_to_cart'] ) : ?>
+			<?php if ( ! empty( $card['is_available'] ) && ! empty( $card['has_add_to_cart'] ) ) : ?>
 				<a
 					class="galaxyone-button add_to_cart_button ajax_add_to_cart"
 					href="<?php echo esc_url( (string) $card['add_to_cart_url'] ); ?>"
@@ -73,7 +75,7 @@ $product_status_id  = 'galaxyone-product-status-' . (int) $card['product_id'];
 				<a
 					class="galaxyone-button galaxyone-button--secondary"
 					href="<?php echo esc_url( (string) $card['product_url'] ); ?>"
-					<?php if ( ! empty( $card['is_available'] ) ) : ?>
+					<?php if ( ! empty( $card['is_available'] ) : ?>
 						aria-label="<?php echo esc_attr( (string) $card['action_label'] . ': ' . $card['name'] ); ?>"
 					<?php else : ?>
 						aria-describedby="<?php echo esc_attr( $product_status_id ); ?>"
