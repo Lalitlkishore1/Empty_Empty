@@ -114,6 +114,10 @@ final class PriceResolver {
 		string $normal_price,
 		?array $rewarded_offer
 	): ?array {
+		if ( ! self::is_staging_environment() ) {
+			return null;
+		}
+
 		if (
 			! is_array( $rewarded_offer ) ||
 			empty( $rewarded_offer['is_verified'] ) ||
@@ -154,6 +158,19 @@ final class PriceResolver {
 			'price'        => $rewarded_price,
 			'campaign_key' => $campaign_key,
 			'event_token'  => $event_token,
+		);
+	}
+
+	/**
+	 * Determines whether staging reward behavior is permitted.
+	 *
+	 * @return bool
+	 */
+	private static function is_staging_environment(): bool {
+		return in_array(
+			wp_get_environment_type(),
+			array( 'local', 'development', 'staging' ),
+			true
 		);
 	}
 
