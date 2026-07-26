@@ -1,9 +1,3 @@
-
-FILE: docs/RELEASE_CHECKLIST.md  
-ACTION: CREATE  
-PURPOSE: Provides the Phase 12 pre-release validation checklist without defining a Phase 13 deployment process.
-
-```md
 # GalaxyOne V1 Pre-Release Checklist
 
 This checklist confirms Phase 12 validation readiness. It does not authorize or describe a production deployment.
