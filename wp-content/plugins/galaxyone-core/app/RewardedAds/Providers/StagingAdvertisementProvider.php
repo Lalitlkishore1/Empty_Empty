@@ -28,6 +28,15 @@ final class StagingAdvertisementProvider implements AdvertisementProviderInterfa
 	 * @return array<string, mixed>
 	 */
 	public function begin( array $campaign, array $event ): array {
+		if ( ! $this->is_staging_environment() ) {
+			return array(
+				'provider_key' => $this->get_key(),
+				'message'      => __( 'This optional reward is unavailable.', 'galaxyone-core' ),
+				'event_token'  => '',
+				'campaign_key' => '',
+			);
+		}
+
 		return array(
 			'provider_key' => $this->get_key(),
 			'message'      => __(
@@ -53,8 +62,22 @@ final class StagingAdvertisementProvider implements AdvertisementProviderInterfa
 	public function verify_completion( array $campaign, array $event, array $payload ): bool {
 		unset( $campaign, $payload );
 
-		return isset( $event['event_token'] ) &&
+		return $this->is_staging_environment() &&
+			isset( $event['event_token'] ) &&
 			is_string( $event['event_token'] ) &&
 			wp_is_uuid( $event['event_token'] );
+	}
+
+	/**
+	 * Determines whether staging reward behavior is permitted.
+	 *
+	 * @return bool
+	 */
+	private function is_staging_environment(): bool {
+		return in_array(
+			wp_get_environment_type(),
+			array( 'local', 'development', 'staging' ),
+			true
+		);
 	}
 }
