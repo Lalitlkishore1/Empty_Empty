@@ -7,6 +7,9 @@
 /.env
 /.env.*
 !/.env.example
+/config/.env
+/config/.env.*
+!/config/.env.example
 
 /wp-config.php
 /wp-config-local.php
