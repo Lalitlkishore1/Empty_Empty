@@ -14,11 +14,15 @@ final class RewardEventRepository {
 	/**
 	 * Creates a pending reward event.
 	 *
-	 * @param array<string, int|string> $campaign     Reward campaign.
+	 * @param array<string, int|string> $campaign      Reward campaign.
 	 * @param string                    $customer_hash Customer identity hash.
 	 * @return array<string, int|string>|null
 	 */
 	public static function create_pending( array $campaign, string $customer_hash ): ?array {
+		if ( ! self::is_staging_environment() ) {
+			return null;
+		}
+
 		global $wpdb;
 
 		$event_token = wp_generate_uuid4();
@@ -74,6 +78,10 @@ final class RewardEventRepository {
 	 * @return array<string, int|string>|null
 	 */
 	public static function get_by_token( string $event_token, string $customer_hash ): ?array {
+		if ( ! self::is_staging_environment() ) {
+			return null;
+		}
+
 		global $wpdb;
 
 		if ( ! wp_is_uuid( $event_token ) ) {
@@ -105,6 +113,10 @@ final class RewardEventRepository {
 	 * @return array<string, int|string>|null
 	 */
 	public static function get_unlocked_for_product( int $product_id, string $customer_hash ): ?array {
+		if ( ! self::is_staging_environment() ) {
+			return null;
+		}
+
 		global $wpdb;
 
 		$table_name = CreateRewardEventsTable::get_table_name();
@@ -137,6 +149,10 @@ final class RewardEventRepository {
 	 * @return bool
 	 */
 	public static function mark_completed( string $event_token, string $customer_hash ): bool {
+		if ( ! self::is_staging_environment() ) {
+			return false;
+		}
+
 		global $wpdb;
 
 		$table_name = CreateRewardEventsTable::get_table_name();
@@ -173,6 +189,10 @@ final class RewardEventRepository {
 	 * @return bool
 	 */
 	public static function redeem( string $event_token, string $customer_hash, int $order_id ): bool {
+		if ( ! self::is_staging_environment() ) {
+			return false;
+		}
+
 		global $wpdb;
 
 		if ( ! wp_is_uuid( $event_token ) || $order_id <= 0 ) {
@@ -211,6 +231,10 @@ final class RewardEventRepository {
 	 * @return int
 	 */
 	public static function expire_events(): int {
+		if ( ! self::is_staging_environment() ) {
+			return 0;
+		}
+
 		global $wpdb;
 
 		$table_name = CreateRewardEventsTable::get_table_name();
@@ -229,6 +253,19 @@ final class RewardEventRepository {
 				current_time( 'mysql', true )
 			)
 		); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+	}
+
+	/**
+	 * Determines whether staging reward behavior is permitted.
+	 *
+	 * @return bool
+	 */
+	private static function is_staging_environment(): bool {
+		return in_array(
+			wp_get_environment_type(),
+			array( 'local', 'development', 'staging' ),
+			true
+		);
 	}
 
 	/**
