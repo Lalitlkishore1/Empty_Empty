@@ -20,6 +20,10 @@ final class RewardRedemptionService {
 	 * @return array<string, int|string|bool>|null
 	 */
 	public static function get_rewarded_offer( int $product_id ): ?array {
+		if ( ! self::is_staging_environment() ) {
+			return null;
+		}
+
 		$product_id = ProductCategoryResolver::get_catalog_product_id( $product_id );
 
 		if ( $product_id <= 0 ) {
@@ -61,6 +65,10 @@ final class RewardRedemptionService {
 	 * @return void
 	 */
 	public static function redeem_order_rewards( WC_Order $order ): void {
+		if ( ! self::is_staging_environment() ) {
+			return;
+		}
+
 		$customer_hash = RewardEligibilityService::get_customer_hash();
 
 		foreach ( $order->get_items( 'line_item' ) as $item ) {
@@ -97,5 +105,18 @@ final class RewardRedemptionService {
 				);
 			}
 		}
+	}
+
+	/**
+	 * Determines whether staging reward behavior is permitted.
+	 *
+	 * @return bool
+	 */
+	private static function is_staging_environment(): bool {
+		return in_array(
+			wp_get_environment_type(),
+			array( 'local', 'development', 'staging' ),
+			true
+		);
 	}
 }
