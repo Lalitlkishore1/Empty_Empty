@@ -44,6 +44,10 @@ final class RewardedAdsModule implements ModuleInterface {
 	 * @return void
 	 */
 	public function register(): void {
+		if ( ! $this->is_staging_environment() ) {
+			return;
+		}
+
 		add_action( 'admin_menu', array( $this, 'register_menu' ), 20 );
 		add_action( 'admin_post_' . self::ADMIN_ACTION, array( $this, 'save_campaign' ) );
 		add_shortcode( 'galaxyone_rewarded_offer', array( $this, 'render_rewarded_offer' ) );
@@ -75,6 +79,10 @@ final class RewardedAdsModule implements ModuleInterface {
 	 * @return void
 	 */
 	public function register_menu(): void {
+		if ( ! $this->is_staging_environment() ) {
+			return;
+		}
+
 		add_submenu_page(
 			'galaxyone-core',
 			__( 'Rewarded Offers', 'galaxyone-core' ),
@@ -91,7 +99,7 @@ final class RewardedAdsModule implements ModuleInterface {
 	 * @return void
 	 */
 	public function render_admin_page(): void {
-		if ( ! Capabilities::can_manage_galaxyone() ) {
+		if ( ! $this->is_staging_environment() || ! Capabilities::can_manage_galaxyone() ) {
 			wp_die(
 				esc_html__( 'You do not have permission to manage rewarded offers.', 'galaxyone-core' ),
 				esc_html__( 'Rewarded Offers', 'galaxyone-core' ),
@@ -113,7 +121,7 @@ final class RewardedAdsModule implements ModuleInterface {
 	 * @return void
 	 */
 	public function save_campaign(): void {
-		if ( ! Capabilities::can_manage_galaxyone() ) {
+		if ( ! $this->is_staging_environment() || ! Capabilities::can_manage_galaxyone() ) {
 			wp_die(
 				esc_html__( 'You do not have permission to update rewarded offers.', 'galaxyone-core' ),
 				esc_html__( 'Rewarded Offers', 'galaxyone-core' ),
@@ -174,6 +182,10 @@ final class RewardedAdsModule implements ModuleInterface {
 	 * @return string
 	 */
 	public function render_rewarded_offer( array $attributes ): string {
+		if ( ! $this->is_staging_environment() ) {
+			return '';
+		}
+
 		$attributes = shortcode_atts(
 			array( 'product_id' => '0' ),
 			$attributes,
@@ -199,6 +211,10 @@ final class RewardedAdsModule implements ModuleInterface {
 	 * @return void
 	 */
 	public function enqueue_assets(): void {
+		if ( ! $this->is_staging_environment() ) {
+			return;
+		}
+
 		wp_enqueue_script(
 			'galaxyone-rewarded-ads',
 			plugins_url( 'assets/js/rewarded-ads.js', GALAXYONE_CORE_FILE ),
@@ -223,6 +239,13 @@ final class RewardedAdsModule implements ModuleInterface {
 	 * @return void
 	 */
 	public function start_reward(): void {
+		if ( ! $this->is_staging_environment() ) {
+			wp_send_json_error(
+				array( 'message' => __( 'This optional reward is unavailable.', 'galaxyone-core' ) ),
+				403
+			);
+		}
+
 		$this->verify_ajax_nonce();
 
 		$product_id = isset( $_POST['product_id'] ) ? absint( $_POST['product_id'] ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Missing
@@ -244,6 +267,13 @@ final class RewardedAdsModule implements ModuleInterface {
 	 * @return void
 	 */
 	public function complete_reward(): void {
+		if ( ! $this->is_staging_environment() ) {
+			wp_send_json_error(
+				array( 'message' => __( 'This optional reward is unavailable.', 'galaxyone-core' ) ),
+				403
+			);
+		}
+
 		$this->verify_ajax_nonce();
 
 		$event_token = isset( $_POST['event_token'] ) && is_string( $_POST['event_token'] ) // phpcs:ignore WordPress.Security.NonceVerification.Missing
@@ -268,7 +298,10 @@ final class RewardedAdsModule implements ModuleInterface {
 	 * @return void
 	 */
 	public function apply_rewarded_cart_prices( WC_Cart $cart ): void {
-		if ( is_admin() && ! wp_doing_ajax() ) {
+		if (
+			! $this->is_staging_environment() ||
+			( is_admin() && ! wp_doing_ajax() )
+		) {
 			return;
 		}
 
@@ -303,9 +336,14 @@ final class RewardedAdsModule implements ModuleInterface {
 	 * @return void
 	 */
 	public function schedule_cleanup(): void {
-		if ( ! wp_next_scheduled( self::CLEANUP_HOOK ) ) {
-			wp_schedule_event( time() + HOUR_IN_SECONDS, 'hourly', self::CLEANUP_HOOK );
+		if (
+			! $this->is_staging_environment() ||
+			wp_next_scheduled( self::CLEANUP_HOOK )
+		) {
+			return;
 		}
+
+		wp_schedule_event( time() + HOUR_IN_SECONDS, 'hourly', self::CLEANUP_HOOK );
 	}
 
 	/**
@@ -338,5 +376,18 @@ final class RewardedAdsModule implements ModuleInterface {
 		return isset( $_POST[ $field ] ) && is_string( $_POST[ $field ] ) // phpcs:ignore WordPress.Security.NonceVerification.Missing
 			? wp_unslash( $_POST[ $field ] ) // phpcs:ignore WordPress.Security.NonceVerification.Missing
 			: '';
+	}
+
+	/**
+	 * Determines whether staging reward behavior is permitted.
+	 *
+	 * @return bool
+	 */
+	private function is_staging_environment(): bool {
+		return in_array(
+			wp_get_environment_type(),
+			array( 'local', 'development', 'staging' ),
+			true
+		);
 	}
 }
