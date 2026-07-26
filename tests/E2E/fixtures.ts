@@ -26,7 +26,13 @@ export async function addCurrentProductToCart(page: Page, productUrl: string): P
   const addToCart = page.locator('form.cart button[type="submit"]').first();
   await expect(addToCart).toBeVisible();
   await addToCart.click();
-  await expect(page).toHaveURL(/cart|checkout|added-to-cart/i);
+
+  const successNotice = page
+    .locator('.woocommerce-message')
+    .filter({ hasText: /added to your cart/i })
+    .first();
+
+  await expect(successNotice).toBeVisible();
 }
 
 export async function completeCheckout(page: Page, postcode: string): Promise<void> {
