@@ -39,6 +39,10 @@ final class RewardCampaignRepository {
 	public static function save( array $campaign ): bool {
 		global $wpdb;
 
+		if ( ! self::is_staging_environment() ) {
+			return false;
+		}
+
 		$campaign = self::normalize_campaign( $campaign );
 
 		if ( ! is_array( $campaign ) ) {
@@ -97,6 +101,10 @@ final class RewardCampaignRepository {
 	public static function get_campaigns(): array {
 		global $wpdb;
 
+		if ( ! self::is_staging_environment() ) {
+			return array();
+		}
+
 		$table_name = CreateRewardCampaignsTable::get_table_name();
 		$campaigns  = $wpdb->get_results(
 			"SELECT campaign_key, name, product_id, offer_price, provider_key, required_completions, reward_ttl_minutes, status, starts_at, ends_at
@@ -123,6 +131,10 @@ final class RewardCampaignRepository {
 	 */
 	public static function get_current_for_product( int $product_id ): ?array {
 		global $wpdb;
+
+		if ( ! self::is_staging_environment() ) {
+			return null;
+		}
 
 		$product_id = ProductCategoryResolver::get_catalog_product_id( $product_id );
 
@@ -162,6 +174,10 @@ final class RewardCampaignRepository {
 	public static function get_campaign( string $campaign_key ): ?array {
 		global $wpdb;
 
+		if ( ! self::is_staging_environment() ) {
+			return null;
+		}
+
 		$campaign_key = sanitize_title( $campaign_key );
 
 		if ( '' === $campaign_key ) {
@@ -190,6 +206,10 @@ final class RewardCampaignRepository {
 	 * @return bool
 	 */
 	public static function is_current( array $campaign ): bool {
+		if ( ! self::is_staging_environment() ) {
+			return false;
+		}
+
 		$now       = current_time( 'mysql', true );
 		$starts_at = (string) $campaign['starts_at'];
 		$ends_at   = (string) $campaign['ends_at'];
@@ -309,6 +329,19 @@ final class RewardCampaignRepository {
 			'status'               => (string) $campaign['status'],
 			'starts_at'            => null === $campaign['starts_at'] ? '' : (string) $campaign['starts_at'],
 			'ends_at'              => null === $campaign['ends_at'] ? '' : (string) $campaign['ends_at'],
+		);
+	}
+
+	/**
+	 * Determines whether staging reward behavior is permitted.
+	 *
+	 * @return bool
+	 */
+	private static function is_staging_environment(): bool {
+		return in_array(
+			wp_get_environment_type(),
+			array( 'local', 'development', 'staging' ),
+			true
 		);
 	}
 }
