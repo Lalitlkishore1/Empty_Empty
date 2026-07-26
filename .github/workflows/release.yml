@@ -1,0 +1,207 @@
+name: Release Readiness
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Release operation to run
+        required: true
+        default: package
+        type: choice
+        options:
+          - package
+          - verify-staging
+      release_version:
+        description: Semantic Versioning release version without a v prefix
+        required: true
+        type: string
+      e2e_base_url:
+        description: Deployed staging site base URL, including https://
+        required: false
+        type: string
+      e2e_normal_product_url:
+        description: Deployed staging URL for a purchasable normal-price product
+        required: false
+        type: string
+      e2e_rewarded_offer_url:
+        description: Deployed staging URL containing a configured staging rewarded offer
+        required: false
+        type: string
+      e2e_postcode:
+        description: Postcode served by the deployed staging delivery configuration
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Release quality gate
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: wordpress_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate release version
+        env:
+          RELEASE_VERSION: ${{ inputs.release_version }}
+        run: |
+          if [[ ! "${RELEASE_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Release version must use Semantic Versioning without a v prefix."
+            exit 1
+          fi
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.1"
+          coverage: none
+
+      - name: Validate Composer configuration
+        run: composer validate
+
+      - name: Install Composer dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Run coding standards
+        run: composer run phpcs
+
+      - name: Run dependency security audit
+        run: composer run security:audit
+
+      - name: Run unit tests
+        run: composer run test:unit
+
+      - name: Prepare WordPress and WooCommerce test environment
+        run: |
+          git clone --depth 1 --branch 6.7 https://github.com/WordPress/wordpress-develop.git /tmp/wordpress-develop
+          cp /tmp/wordpress-develop/wp-tests-config-sample.php /tmp/wordpress-develop/wp-tests-config.php
+          sed -i 's/youremptytestdbnamehere/wordpress_test/' /tmp/wordpress-develop/wp-tests-config.php
+          sed -i 's/yourusernamehere/root/' /tmp/wordpress-develop/wp-tests-config.php
+          sed -i 's/yourpasswordhere/root/' /tmp/wordpress-develop/wp-tests-config.php
+          sed -i 's|localhost|127.0.0.1|' /tmp/wordpress-develop/wp-tests-config.php
+          curl --fail --location https://downloads.wordpress.org/plugin/woocommerce.latest-stable.zip --output /tmp/woocommerce.zip
+          unzip -q /tmp/woocommerce.zip -d /tmp/wordpress-develop/src/wp-content/plugins
+
+      - name: Run integration tests
+        env:
+          WP_TESTS_DIR: /tmp/wordpress-develop/tests/phpunit
+          WP_CORE_DIR: /tmp/wordpress-develop/src
+        run: composer run test:integration
+
+  package:
+    name: Package release candidate
+    if: ${{ inputs.operation == 'package' }}
+    needs: quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.1"
+          coverage: none
+
+      - name: Install plugin production autoloader
+        run: composer install --working-dir=wp-content/plugins/galaxyone-core --no-dev --prefer-dist --no-interaction --no-progress --optimize-autoloader
+
+      - name: Create release packages
+        env:
+          RELEASE_VERSION: ${{ inputs.release_version }}
+        run: |
+          mkdir -p dist
+          (
+            cd wp-content/plugins
+            zip -qr "${GITHUB_WORKSPACE}/dist/galaxyone-core-${RELEASE_VERSION}.zip" galaxyone-core \
+              -x 'galaxyone-core/.git/*' \
+                 'galaxyone-core/.env' \
+                 'galaxyone-core/.env.*' \
+                 'galaxyone-core/config/.env' \
+                 'galaxyone-core/config/.env.*'
+          )
+          (
+            cd wp-content/themes
+            zip -qr "${GITHUB_WORKSPACE}/dist/galaxyone-child-${RELEASE_VERSION}.zip" galaxyone-child \
+              -x 'galaxyone-child/.git/*' \
+                 'galaxyone-child/.env' \
+                 'galaxyone-child/.env.*'
+          )
+          (
+            cd dist
+            sha256sum *.zip > SHA256SUMS.txt
+          )
+
+      - name: Upload release candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-candidate-${{ inputs.release_version }}-${{ github.sha }}
+          path: dist
+          if-no-files-found: error
+
+  verify-staging:
+    name: Verify deployed staging release
+    if: ${{ inputs.operation == 'verify-staging' }}
+    needs: quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate staging inputs
+        env:
+          E2E_BASE_URL: ${{ inputs.e2e_base_url }}
+          E2E_NORMAL_PRODUCT_URL: ${{ inputs.e2e_normal_product_url }}
+          E2E_REWARDED_OFFER_URL: ${{ inputs.e2e_rewarded_offer_url }}
+          E2E_POSTCODE: ${{ inputs.e2e_postcode }}
+        run: |
+          test -n "${E2E_BASE_URL}"
+          test -n "${E2E_NORMAL_PRODUCT_URL}"
+          test -n "${E2E_REWARDED_OFFER_URL}"
+          test -n "${E2E_POSTCODE}"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install end-to-end dependencies
+        run: npm --prefix tests/E2E install --no-audit --no-fund
+
+      - name: Install Chromium
+        run: npx --prefix tests/E2E playwright install --with-deps chromium
+
+      - name: Run staging end-to-end tests
+        env:
+          E2E_BASE_URL: ${{ inputs.e2e_base_url }}
+          E2E_NORMAL_PRODUCT_URL: ${{ inputs.e2e_normal_product_url }}
+          E2E_REWARDED_OFFER_URL: ${{ inputs.e2e_rewarded_offer_url }}
+          E2E_POSTCODE: ${{ inputs.e2e_postcode }}
+        run: npm --prefix tests/E2E run test
+
+      - name: Upload Playwright report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-playwright-report-${{ inputs.release_version }}-${{ github.sha }}
+          path: tests/E2E/playwright-report
+          if-no-files-found: ignore
