@@ -12,9 +12,19 @@
     "squizlabs/php_codesniffer": "^3.10",
     "wp-coding-standards/wpcs": "^3.1"
   },
+  "autoload-dev": {
+    "psr-4": {
+      "GalaxyOne\\Core\\": "wp-content/plugins/galaxyone-core/app/",
+      "GalaxyOne\\Tests\\": "tests/"
+    }
+  },
   "scripts": {
     "phpcs": "phpcs --standard=phpcs.xml.dist",
-    "test": "phpunit --configuration phpunit.xml.dist"
+    "test": "@test:unit",
+    "test:unit": "phpunit --configuration phpunit.xml.dist",
+    "test:integration": "phpunit --configuration tests/Integration/phpunit.xml",
+    "test:e2e": "npm --prefix tests/E2E run test",
+    "security:audit": "composer audit"
   },
   "config": {
     "allow-plugins": {
