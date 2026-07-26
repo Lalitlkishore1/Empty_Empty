@@ -367,6 +367,22 @@ final class UpgradeDeliveryReservationAtomicity implements MigrationInterface {
 	): bool {
 		global $wpdb;
 
+		$unmatched_reservation = $wpdb->get_var(
+			"SELECT r.id
+			FROM {$reservations_table} r
+			LEFT JOIN {$capacity_table} c
+				ON c.delivery_date = r.delivery_date
+				AND c.slot_key = r.slot_key
+			WHERE r.status IN ('active', 'confirmed')
+			GROUP BY r.id
+			HAVING COUNT(c.id) <> 1
+			LIMIT 1" // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		);
+
+		if ( null !== $unmatched_reservation ) {
+			return false;
+		}
+
 		$invalid_row = $wpdb->get_var(
 			"SELECT c.id
 			FROM {$capacity_table} c
