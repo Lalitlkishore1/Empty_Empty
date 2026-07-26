@@ -7,8 +7,8 @@
   cacheResult="false"
 >
   <testsuites>
-    <testsuite name="GalaxyOne">
-      <directory suffix="Test.php">tests</directory>
+    <testsuite name="GalaxyOne Unit">
+      <directory suffix="Test.php">tests/Unit</directory>
     </testsuite>
   </testsuites>
 </phpunit>
