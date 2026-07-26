@@ -7,13 +7,31 @@ on:
   pull_request:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      e2e_base_url:
+        description: Staging site base URL, including https://
+        required: true
+        type: string
+      e2e_normal_product_url:
+        description: Staging URL for a purchasable normal-price product
+        required: true
+        type: string
+      e2e_rewarded_offer_url:
+        description: Staging URL containing a configured staging rewarded offer
+        required: true
+        type: string
+      e2e_postcode:
+        description: Postcode served by the staging delivery configuration
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 jobs:
   quality:
-    name: PHP quality checks
+    name: PHP quality and unit tests
     runs-on: ubuntu-latest
 
     steps:
@@ -35,5 +53,92 @@ jobs:
       - name: Run coding standards
         run: composer run phpcs
 
-      - name: Run tests
-        run: composer run test
+      - name: Run dependency security audit
+        run: composer run security:audit
+
+      - name: Run unit tests
+        run: composer run test:unit
+
+  integration:
+    name: WordPress and WooCommerce integration tests
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: wordpress_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.1"
+          coverage: none
+
+      - name: Install Composer dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Prepare WordPress and WooCommerce test environment
+        run: |
+          git clone --depth 1 --branch 6.7 https://github.com/WordPress/wordpress-develop.git /tmp/wordpress-develop
+          cp /tmp/wordpress-develop/wp-tests-config-sample.php /tmp/wordpress-develop/wp-tests-config.php
+          sed -i 's/youremptytestdbnamehere/wordpress_test/' /tmp/wordpress-develop/wp-tests-config.php
+          sed -i 's/yourusernamehere/root/' /tmp/wordpress-develop/wp-tests-config.php
+          sed -i 's/yourpasswordhere/root/' /tmp/wordpress-develop/wp-tests-config.php
+          sed -i 's|localhost|127.0.0.1|' /tmp/wordpress-develop/wp-tests-config.php
+          curl --fail --location https://downloads.wordpress.org/plugin/woocommerce.latest-stable.zip --output /tmp/woocommerce.zip
+          unzip -q /tmp/woocommerce.zip -d /tmp/wordpress-develop/src/wp-content/plugins
+
+      - name: Run integration tests
+        env:
+          WP_TESTS_DIR: /tmp/wordpress-develop/tests/phpunit
+          WP_CORE_DIR: /tmp/wordpress-develop/src
+        run: composer run test:integration
+
+  end-to-end:
+    name: Staging end-to-end tests
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install end-to-end dependencies
+        run: npm --prefix tests/E2E install --no-audit --no-fund
+
+      - name: Install Chromium
+        run: npx --prefix tests/E2E playwright install --with-deps chromium
+
+      - name: Run staging end-to-end tests
+        env:
+          E2E_BASE_URL: ${{ inputs.e2e_base_url }}
+          E2E_NORMAL_PRODUCT_URL: ${{ inputs.e2e_normal_product_url }}
+          E2E_REWARDED_OFFER_URL: ${{ inputs.e2e_rewarded_offer_url }}
+          E2E_POSTCODE: ${{ inputs.e2e_postcode }}
+        run: npm --prefix tests/E2E run test
+
+      - name: Upload Playwright report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: tests/E2E/playwright-report
+          if-no-files-found: ignore
