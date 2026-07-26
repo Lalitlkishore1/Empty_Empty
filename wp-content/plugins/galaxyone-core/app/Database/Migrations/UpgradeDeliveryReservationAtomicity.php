@@ -284,7 +284,7 @@ final class UpgradeDeliveryReservationAtomicity implements MigrationInterface {
 	}
 
 	/**
-	 * Determines whether a unique single-column idempotency index exists.
+	 * Determines whether a full, single-column unique idempotency index exists.
 	 *
 	 * @param string $table_name Reservation table name.
 	 * @return bool
@@ -297,19 +297,58 @@ final class UpgradeDeliveryReservationAtomicity implements MigrationInterface {
 			ARRAY_A
 		);
 
-		if ( ! is_array( $indexes ) ) {
+		if ( ! is_array( $indexes ) || empty( $indexes ) ) {
 			return false;
 		}
 
+		$grouped_indexes = array();
+
 		foreach ( $indexes as $index ) {
 			if (
-				isset( $index['Column_name'], $index['Non_unique'], $index['Seq_in_index'] ) &&
-				'idempotency_key' === (string) $index['Column_name'] &&
-				0 === (int) $index['Non_unique'] &&
-				1 === (int) $index['Seq_in_index']
+				! is_array( $index ) ||
+				! array_key_exists( 'Key_name', $index ) ||
+				! array_key_exists( 'Non_unique', $index ) ||
+				! array_key_exists( 'Column_name', $index ) ||
+				! array_key_exists( 'Seq_in_index', $index ) ||
+				! array_key_exists( 'Sub_part', $index ) ||
+				! is_scalar( $index['Key_name'] )
 			) {
-				return true;
+				return false;
 			}
+
+			$index_name = (string) $index['Key_name'];
+
+			if ( '' === $index_name ) {
+				return false;
+			}
+
+			if ( ! isset( $grouped_indexes[ $index_name ] ) ) {
+				$grouped_indexes[ $index_name ] = array();
+			}
+
+			$grouped_indexes[ $index_name ][] = $index;
+		}
+
+		foreach ( $grouped_indexes as $index_rows ) {
+			if ( 1 !== count( $index_rows ) ) {
+				continue;
+			}
+
+			$index = $index_rows[0];
+
+			if (
+				! is_scalar( $index['Non_unique'] ) ||
+				! is_scalar( $index['Column_name'] ) ||
+				! is_scalar( $index['Seq_in_index'] ) ||
+				'0' !== (string) $index['Non_unique'] ||
+				'idempotency_key' !== (string) $index['Column_name'] ||
+				'1' !== (string) $index['Seq_in_index'] ||
+				null !== $index['Sub_part']
+			) {
+				continue;
+			}
+
+			return true;
 		}
 
 		return false;
