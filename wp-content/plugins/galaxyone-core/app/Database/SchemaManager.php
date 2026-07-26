@@ -16,6 +16,7 @@ use GalaxyOne\Core\Database\Migrations\CreateNotificationLogTable;
 use GalaxyOne\Core\Database\Migrations\CreateOfferCampaignsTable;
 use GalaxyOne\Core\Database\Migrations\CreateRewardCampaignsTable;
 use GalaxyOne\Core\Database\Migrations\CreateRewardEventsTable;
+use GalaxyOne\Core\Database\Migrations\UpgradeDeliveryReservationAtomicity;
 
 final class SchemaManager {
 
@@ -69,11 +70,18 @@ final class SchemaManager {
 	private const NOTIFICATION_SCHEMA_VERSION = '0.8.0';
 
 	/**
+	 * Schema version that introduced atomic delivery reservations.
+	 *
+	 * @var string
+	 */
+	private const DELIVERY_ATOMICITY_SCHEMA_VERSION = '0.9.0';
+
+	/**
 	 * Current database schema version.
 	 *
 	 * @var string
 	 */
-	private const CURRENT_SCHEMA_VERSION = self::NOTIFICATION_SCHEMA_VERSION;
+	private const CURRENT_SCHEMA_VERSION = self::DELIVERY_ATOMICITY_SCHEMA_VERSION;
 
 	/**
 	 * Initializes the schema during activation.
@@ -135,6 +143,13 @@ final class SchemaManager {
 		if (
 			version_compare( $installed_version, self::NOTIFICATION_SCHEMA_VERSION, '<' ) &&
 			! CreateNotificationLogTable::up()
+		) {
+			return;
+		}
+
+		if (
+			version_compare( $installed_version, self::DELIVERY_ATOMICITY_SCHEMA_VERSION, '<' ) &&
+			! UpgradeDeliveryReservationAtomicity::up()
 		) {
 			return;
 		}
