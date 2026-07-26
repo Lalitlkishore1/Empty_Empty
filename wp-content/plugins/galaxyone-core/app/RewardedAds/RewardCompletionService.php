@@ -21,6 +21,13 @@ final class RewardCompletionService {
 	 * @return array<string, mixed>|WP_Error
 	 */
 	public static function begin( int $product_id ): array|WP_Error {
+		if ( ! self::is_staging_environment() ) {
+			return new WP_Error(
+				'galaxyone_reward_unavailable',
+				__( 'This optional reward is unavailable.', 'galaxyone-core' )
+			);
+		}
+
 		$campaign = RewardEligibilityService::get_campaign( $product_id );
 
 		if ( ! is_array( $campaign ) ) {
@@ -75,6 +82,13 @@ final class RewardCompletionService {
 	 * @return array<string, mixed>|WP_Error
 	 */
 	public static function complete( string $event_token, array $payload = array() ): array|WP_Error {
+		if ( ! self::is_staging_environment() ) {
+			return new WP_Error(
+				'galaxyone_reward_unavailable',
+				__( 'This optional reward is unavailable.', 'galaxyone-core' )
+			);
+		}
+
 		$customer_hash = RewardEligibilityService::get_customer_hash();
 		$event         = RewardEventRepository::get_by_token( $event_token, $customer_hash );
 
@@ -137,10 +151,23 @@ final class RewardCompletionService {
 	 * @return AdvertisementProviderInterface|null
 	 */
 	private static function get_provider( string $provider_key ): ?AdvertisementProviderInterface {
-		if ( 'staging' === $provider_key ) {
+		if ( 'staging' === $provider_key && self::is_staging_environment() ) {
 			return new StagingAdvertisementProvider();
 		}
 
 		return null;
+	}
+
+	/**
+	 * Determines whether staging reward behavior is permitted.
+	 *
+	 * @return bool
+	 */
+	private static function is_staging_environment(): bool {
+		return in_array(
+			wp_get_environment_type(),
+			array( 'local', 'development', 'staging' ),
+			true
+		);
 	}
 }
