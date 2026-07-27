@@ -748,10 +748,11 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 				stream_set_blocking( $pipes[2], false );
 
 				$workers[] = array(
-					'process' => $process,
-					'stdout'  => $pipes[1],
-					'stderr'  => $pipes[2],
-					'closed'  => false,
+					'process'   => $process,
+					'stdout'    => $pipes[1],
+					'stderr'    => $pipes[2],
+					'exit_code' => null,
+					'closed'    => false,
 				);
 			}
 
@@ -790,15 +791,27 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 			while ( microtime( true ) < $deadline ) {
 				$running = false;
 
-				foreach ( $workers as $worker ) {
+				foreach ( $workers as $index => $worker ) {
 					if (
-						! $worker['closed'] &&
-						is_resource( $worker['process'] ) &&
-						true === proc_get_status( $worker['process'] )['running']
+						$worker['closed'] ||
+						! is_resource( $worker['process'] ) ||
+						is_int( $worker['exit_code'] )
 					) {
+						continue;
+					}
+
+					$status = proc_get_status( $worker['process'] );
+
+					if ( true === $status['running'] ) {
 						$running = true;
 						break;
 					}
+
+					self::assertArrayHasKey( 'exitcode', $status );
+					self::assertIsInt( $status['exitcode'] );
+					self::assertGreaterThanOrEqual( 0, $status['exitcode'] );
+
+					$workers[ $index ]['exit_code'] = $status['exitcode'];
 				}
 
 				if ( ! $running ) {
@@ -886,9 +899,7 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 			self::fail( 'A delivery concurrency worker was unavailable.' );
 		}
 
-		$status = proc_get_status( $worker['process'] );
-
-		if ( true === $status['running'] ) {
+		if ( ! is_int( $worker['exit_code'] ) ) {
 			$this->finalize_worker( $worker, true );
 			self::fail( 'A delivery concurrency worker exceeded the test timeout.' );
 		}
@@ -896,29 +907,38 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 		$stdout = is_resource( $worker['stdout'] ) ? stream_get_contents( $worker['stdout'] ) : false;
 		$stderr = is_resource( $worker['stderr'] ) ? stream_get_contents( $worker['stderr'] ) : false;
 
-		$exit_code = $this->finalize_worker( $worker, false );
-		$result    = is_string( $stdout ) ? json_decode( $stdout, true ) : null;
+		$this->finalize_worker( $worker, false );
+		$result = is_string( $stdout ) ? json_decode( $stdout, true ) : null;
 
 		self::assertIsArray( $result, is_string( $stderr ) ? $stderr : '' );
 
 		return array(
-			'exit_code' => $exit_code,
+			'exit_code' => $worker['exit_code'],
 			'result'    => $result,
 		);
 	}
 
-	private function finalize_worker( array &$worker, bool $terminate ): int {
+	private function finalize_worker( array &$worker, bool $terminate ): void {
 		if ( true === $worker['closed'] ) {
-			return -1;
+			return;
 		}
 
-		$exit_code = -1;
-
-		if ( isset( $worker['process'] ) && is_resource( $worker['process'] ) ) {
+		if (
+			$terminate &&
+			! is_int( $worker['exit_code'] ) &&
+			isset( $worker['process'] ) &&
+			is_resource( $worker['process'] )
+		) {
 			$status = proc_get_status( $worker['process'] );
 
-			if ( $terminate && true === $status['running'] ) {
+			if ( true === $status['running'] ) {
 				proc_terminate( $worker['process'] );
+			} elseif (
+				isset( $status['exitcode'] ) &&
+				is_int( $status['exitcode'] ) &&
+				$status['exitcode'] >= 0
+			) {
+				$worker['exit_code'] = $status['exitcode'];
 			}
 		}
 
@@ -929,12 +949,10 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 		}
 
 		if ( isset( $worker['process'] ) && is_resource( $worker['process'] ) ) {
-			$exit_code = proc_close( $worker['process'] );
+			proc_close( $worker['process'] );
 		}
 
 		$worker['closed'] = true;
-
-		return $exit_code;
 	}
 
 	private function cleanup_fixtures(): void {
@@ -971,6 +989,4 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 				$this->slot_key,
 				$this->postcode
 			)
-		); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-	}
-}
+		); // phpcs:ignore Wordcontrol to=??
