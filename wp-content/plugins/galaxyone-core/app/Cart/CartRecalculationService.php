@@ -31,6 +31,20 @@ final class CartRecalculationService {
 	private const DELIVERY_RESERVATION_SESSION_KEY = 'galaxyone_delivery_reservation';
 
 	/**
+	 * Customer-session key for stable delivery reservation operation data.
+	 *
+	 * @var string
+	 */
+	private const DELIVERY_OPERATION_SESSION_KEY = 'galaxyone_delivery_operation';
+
+	/**
+	 * Customer-session key indicating that a prior reservation could not be released.
+	 *
+	 * @var string
+	 */
+	private const DELIVERY_RELEASE_FAILED_SESSION_KEY = 'galaxyone_delivery_release_failed';
+
+	/**
 	 * Customer-session key for recalculated delivery-fee data.
 	 *
 	 * @var string
@@ -134,8 +148,8 @@ final class CartRecalculationService {
 	/**
 	 * Stores a sanitized delivery selection in the WooCommerce customer session.
 	 *
-	 * A selection change releases a previous provisional reservation, ensuring
-	 * abandoned or changed selections do not hold capacity unnecessarily.
+	 * A selection change releases a previous provisional reservation before
+	 * allowing a new logical reservation attempt to be created.
 	 *
 	 * @param string $postcode      Selected postcode.
 	 * @param string $delivery_date Selected date.
@@ -155,9 +169,16 @@ final class CartRecalculationService {
 		$current   = self::get_delivery_selection();
 
 		if ( $selection !== $current ) {
-			self::release_cart_reservation();
+			if ( ! self::release_cart_reservation() ) {
+				self::set_session_value( self::DELIVERY_RELEASE_FAILED_SESSION_KEY, true );
+
+				return;
+			}
+
+			self::clear_delivery_operation();
 		}
 
+		self::set_session_value( self::DELIVERY_RELEASE_FAILED_SESSION_KEY, false );
 		self::set_session_value( self::DELIVERY_SELECTION_SESSION_KEY, $selection );
 	}
 
@@ -226,6 +247,7 @@ final class CartRecalculationService {
 	 */
 	public static function reserve_delivery_selection(): array|WP_Error {
 		$selection = self::get_delivery_selection();
+		$quantity  = 1;
 
 		if ( ! self::has_complete_delivery_selection( $selection ) ) {
 			return new WP_Error(
@@ -234,14 +256,35 @@ final class CartRecalculationService {
 			);
 		}
 
-		self::release_cart_reservation();
+		if ( true === self::get_session_value( self::DELIVERY_RELEASE_FAILED_SESSION_KEY ) ) {
+			return new WP_Error(
+				'galaxyone_delivery_reservation_release_failed',
+				__( 'Your previous delivery reservation could not be released. Please try again.', 'galaxyone-core' )
+			);
+		}
+
+		$operation_key = self::get_or_create_delivery_operation_key(
+			(string) $selection['delivery_date'],
+			(string) $selection['slot_key'],
+			$quantity
+		);
+
+		if ( '' === $operation_key ) {
+			return new WP_Error(
+				'galaxyone_delivery_reservation_unavailable',
+				__( 'The selected delivery slot could not be reserved. Please try again.', 'galaxyone-core' )
+			);
+		}
 
 		$reservation = DeliveryValidationService::reserve(
 			array(
 				'postcode' => (string) $selection['postcode'],
 			),
 			(string) $selection['delivery_date'],
-			(string) $selection['slot_key']
+			(string) $selection['slot_key'],
+			$quantity,
+			0,
+			$operation_key
 		);
 
 		if ( $reservation instanceof WP_Error ) {
@@ -281,16 +324,26 @@ final class CartRecalculationService {
 	/**
 	 * Releases the current provisional delivery reservation.
 	 *
-	 * @return void
+	 * @return bool
 	 */
-	public static function release_cart_reservation(): void {
+	public static function release_cart_reservation(): bool {
 		$reservation = self::get_delivery_reservation();
 
-		if ( isset( $reservation['token'] ) && is_scalar( $reservation['token'] ) ) {
-			DeliveryReservationService::release( (string) $reservation['token'] );
+		if ( ! isset( $reservation['token'] ) || ! is_scalar( $reservation['token'] ) ) {
+			self::set_session_value( self::DELIVERY_RESERVATION_SESSION_KEY, array() );
+			self::clear_delivery_operation();
+
+			return true;
+		}
+
+		if ( ! DeliveryReservationService::release( (string) $reservation['token'] ) ) {
+			return false;
 		}
 
 		self::set_session_value( self::DELIVERY_RESERVATION_SESSION_KEY, array() );
+		self::clear_delivery_operation();
+
+		return true;
 	}
 
 	/**
@@ -300,6 +353,8 @@ final class CartRecalculationService {
 	 */
 	public static function clear_cart_reservation(): void {
 		self::set_session_value( self::DELIVERY_RESERVATION_SESSION_KEY, array() );
+		self::clear_delivery_operation();
+		self::set_session_value( self::DELIVERY_RELEASE_FAILED_SESSION_KEY, false );
 	}
 
 	/**
@@ -329,6 +384,205 @@ final class CartRecalculationService {
 		return '' !== $selection['postcode'] &&
 			'' !== $selection['delivery_date'] &&
 			'' !== $selection['slot_key'];
+	}
+
+	/**
+	 * Returns a stable server-generated operation key for one delivery attempt.
+	 *
+	 * @param string $delivery_date Normalized delivery date.
+	 * @param string $slot_key      Normalized delivery slot key.
+	 * @param int    $quantity      Reserved capacity.
+	 * @return string
+	 */
+	private static function get_or_create_delivery_operation_key(
+		string $delivery_date,
+		string $slot_key,
+		int $quantity
+	): string {
+		$delivery_date = sanitize_text_field( $delivery_date );
+		$slot_key      = sanitize_title( $slot_key );
+
+		if (
+			! DeliveryValidationService::is_valid_delivery_operation(
+				$delivery_date,
+				$slot_key,
+				$quantity
+			)
+		) {
+			return '';
+		}
+
+		$reservation = self::get_delivery_reservation();
+
+		if ( self::reservation_has_expired( $reservation ) ) {
+			self::set_session_value( self::DELIVERY_RESERVATION_SESSION_KEY, array() );
+			self::clear_delivery_operation();
+			$reservation = array();
+		}
+
+		$operation = self::get_delivery_operation();
+
+		if ( self::reservation_has_token( $reservation ) ) {
+			if (
+				! self::reservation_matches(
+					$reservation,
+					$delivery_date,
+					$slot_key,
+					$quantity
+				) ||
+				! self::operation_matches(
+					$operation,
+					$delivery_date,
+					$slot_key,
+					$quantity
+				)
+			) {
+				return '';
+			}
+
+			return (string) $operation['key'];
+		}
+
+		if ( self::operation_matches( $operation, $delivery_date, $slot_key, $quantity ) ) {
+			return (string) $operation['key'];
+		}
+
+		$key = wp_generate_uuid4();
+
+		if ( ! wp_is_uuid( $key ) ) {
+			return '';
+		}
+
+		self::set_session_value(
+			self::DELIVERY_OPERATION_SESSION_KEY,
+			array(
+				'key'           => $key,
+				'delivery_date' => $delivery_date,
+				'slot_key'      => $slot_key,
+				'quantity'      => $quantity,
+			)
+		);
+
+		return $key;
+	}
+
+	/**
+	 * Returns the current delivery operation data.
+	 *
+	 * @return array<string, int|string>
+	 */
+	private static function get_delivery_operation(): array {
+		$operation = self::get_session_value( self::DELIVERY_OPERATION_SESSION_KEY );
+
+		if ( ! is_array( $operation ) ) {
+			return array();
+		}
+
+		return array(
+			'key'           => isset( $operation['key'] ) && is_scalar( $operation['key'] )
+				? trim( (string) $operation['key'] )
+				: '',
+			'delivery_date' => isset( $operation['delivery_date'] ) && is_scalar( $operation['delivery_date'] )
+				? sanitize_text_field( (string) $operation['delivery_date'] )
+				: '',
+			'slot_key'      => isset( $operation['slot_key'] ) && is_scalar( $operation['slot_key'] )
+				? sanitize_title( (string) $operation['slot_key'] )
+				: '',
+			'quantity'      => isset( $operation['quantity'] ) ? absint( $operation['quantity'] ) : 0,
+		);
+	}
+
+	/**
+	 * Determines whether the stored operation is for this exact attempt.
+	 *
+	 * @param array<string, int|string> $operation     Stored operation data.
+	 * @param string                    $delivery_date Normalized date.
+	 * @param string                    $slot_key      Normalized slot.
+	 * @param int                       $quantity      Reserved quantity.
+	 * @return bool
+	 */
+	private static function operation_matches(
+		array $operation,
+		string $delivery_date,
+		string $slot_key,
+		int $quantity
+	): bool {
+		return isset(
+			$operation['key'],
+			$operation['delivery_date'],
+			$operation['slot_key'],
+			$operation['quantity']
+		) &&
+			wp_is_uuid( (string) $operation['key'] ) &&
+			$delivery_date === (string) $operation['delivery_date'] &&
+			$slot_key === (string) $operation['slot_key'] &&
+			$quantity === (int) $operation['quantity'];
+	}
+
+	/**
+	 * Determines whether a session reservation matches the requested attempt.
+	 *
+	 * @param array<string, int|string> $reservation   Session reservation.
+	 * @param string                    $delivery_date Normalized date.
+	 * @param string                    $slot_key      Normalized slot.
+	 * @param int                       $quantity      Reserved quantity.
+	 * @return bool
+	 */
+	private static function reservation_matches(
+		array $reservation,
+		string $delivery_date,
+		string $slot_key,
+		int $quantity
+	): bool {
+		return isset(
+			$reservation['delivery_date'],
+			$reservation['slot_key'],
+			$reservation['quantity']
+		) &&
+			$delivery_date === sanitize_text_field( (string) $reservation['delivery_date'] ) &&
+			$slot_key === sanitize_title( (string) $reservation['slot_key'] ) &&
+			$quantity === (int) $reservation['quantity'];
+	}
+
+	/**
+	 * Determines whether a session reservation contains a valid token.
+	 *
+	 * @param array<string, int|string> $reservation Session reservation.
+	 * @return bool
+	 */
+	private static function reservation_has_token( array $reservation ): bool {
+		return isset( $reservation['token'] ) &&
+			is_scalar( $reservation['token'] ) &&
+			wp_is_uuid( (string) $reservation['token'] );
+	}
+
+	/**
+	 * Determines whether a provisional reservation has reached its known expiry.
+	 *
+	 * @param array<string, int|string> $reservation Session reservation.
+	 * @return bool
+	 */
+	private static function reservation_has_expired( array $reservation ): bool {
+		if (
+			! self::reservation_has_token( $reservation ) ||
+			! isset( $reservation['expires_at'] ) ||
+			! is_scalar( $reservation['expires_at'] )
+		) {
+			return false;
+		}
+
+		$expires_at = (string) $reservation['expires_at'];
+
+		return '' !== $expires_at && $expires_at <= gmdate( 'Y-m-d H:i:s' );
+	}
+
+	/**
+	 * Clears the stable operation data after a known terminal state.
+	 *
+	 * @return void
+	 */
+	private static function clear_delivery_operation(): void {
+		self::set_session_value( self::DELIVERY_OPERATION_SESSION_KEY, array() );
 	}
 
 	/**
