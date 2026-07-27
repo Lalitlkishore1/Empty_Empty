@@ -14,22 +14,26 @@ final class DeliveryValidationService {
 	/**
 	 * Validates a delivery selection without creating a reservation.
 	 *
-	 * @param array<string, mixed> $address       WooCommerce-style address data.
-	 * @param string               $delivery_date Selected date in Y-m-d format.
-	 * @param string               $slot_key      Selected slot key.
-	 * @param int                  $quantity      Required capacity.
+	 * @param array<string, mixed> $address        WooCommerce-style address data.
+	 * @param string               $delivery_date  Selected date in Y-m-d format.
+	 * @param string               $slot_key       Selected slot key.
+	 * @param int                  $quantity       Required capacity.
+	 * @param bool                 $check_capacity Whether to perform the non-authoritative capacity pre-check.
 	 * @return array<string, mixed>|WP_Error
 	 */
 	public static function validate(
 		array $address,
 		string $delivery_date,
 		string $slot_key,
-		int $quantity = 1
+		int $quantity = 1,
+		bool $check_capacity = true
 	): array|WP_Error {
-		$postcode = isset( $address['postcode'] ) && is_scalar( $address['postcode'] )
+		$delivery_date = sanitize_text_field( $delivery_date );
+		$slot_key      = sanitize_title( $slot_key );
+		$postcode      = isset( $address['postcode'] ) && is_scalar( $address['postcode'] )
 			? (string) $address['postcode']
 			: '';
-		$area     = ServiceAreaService::get_service_area( $postcode );
+		$area          = ServiceAreaService::get_service_area( $postcode );
 
 		if ( ! is_array( $area ) ) {
 			return new WP_Error(
@@ -45,7 +49,10 @@ final class DeliveryValidationService {
 			);
 		}
 
-		if ( ! DeliveryCapacityService::has_capacity( $delivery_date, $slot_key, $quantity ) ) {
+		if (
+			$check_capacity &&
+			! DeliveryCapacityService::has_capacity( $delivery_date, $slot_key, $quantity )
+		) {
 			return new WP_Error(
 				'galaxyone_delivery_capacity_full',
 				__( 'The selected delivery slot has reached capacity.', 'galaxyone-core' )
@@ -64,11 +71,12 @@ final class DeliveryValidationService {
 	/**
 	 * Validates and reserves a delivery selection.
 	 *
-	 * @param array<string, mixed> $address       WooCommerce-style address data.
-	 * @param string               $delivery_date Selected date in Y-m-d format.
-	 * @param string               $slot_key      Selected slot key.
-	 * @param int                  $quantity      Required capacity.
-	 * @param int                  $order_id      WooCommerce order ID when available.
+	 * @param array<string, mixed> $address         WooCommerce-style address data.
+	 * @param string               $delivery_date   Selected date in Y-m-d format.
+	 * @param string               $slot_key        Selected slot key.
+	 * @param int                  $quantity        Required capacity.
+	 * @param int                  $order_id        WooCommerce order ID when available.
+	 * @param string               $idempotency_key Stable server-side operation UUID.
 	 * @return array<string, mixed>|WP_Error
 	 */
 	public static function reserve(
@@ -76,19 +84,44 @@ final class DeliveryValidationService {
 		string $delivery_date,
 		string $slot_key,
 		int $quantity = 1,
-		int $order_id = 0
+		int $order_id = 0,
+		string $idempotency_key = ''
 	): array|WP_Error {
-		$validation = self::validate( $address, $delivery_date, $slot_key, $quantity );
+		$delivery_date   = sanitize_text_field( $delivery_date );
+		$slot_key        = sanitize_title( $slot_key );
+		$idempotency_key = trim( $idempotency_key );
+		$validation      = self::validate(
+			$address,
+			$delivery_date,
+			$slot_key,
+			$quantity,
+			false
+		);
 
 		if ( $validation instanceof WP_Error ) {
 			return $validation;
+		}
+
+		if (
+			! self::is_valid_delivery_operation(
+				$delivery_date,
+				$slot_key,
+				$quantity
+			) ||
+			! wp_is_uuid( $idempotency_key )
+		) {
+			return new WP_Error(
+				'galaxyone_delivery_reservation_failed',
+				__( 'The selected delivery slot could not be reserved. Please choose another slot.', 'galaxyone-core' )
+			);
 		}
 
 		$reservation = DeliveryReservationService::create(
 			$delivery_date,
 			$slot_key,
 			$quantity,
-			$order_id
+			$order_id,
+			$idempotency_key
 		);
 
 		if ( ! is_array( $reservation ) ) {
@@ -101,5 +134,23 @@ final class DeliveryValidationService {
 		$validation['reservation'] = $reservation;
 
 		return $validation;
+	}
+
+	/**
+	 * Determines whether normalized operation attributes are valid.
+	 *
+	 * @param string $delivery_date Normalized delivery date.
+	 * @param string $slot_key      Normalized delivery slot key.
+	 * @param int    $quantity      Reserved capacity.
+	 * @return bool
+	 */
+	public static function is_valid_delivery_operation(
+		string $delivery_date,
+		string $slot_key,
+		int $quantity
+	): bool {
+		return DeliverySlotService::is_valid_date( $delivery_date ) &&
+			'' !== sanitize_title( $slot_key ) &&
+			$quantity > 0;
 	}
 }
