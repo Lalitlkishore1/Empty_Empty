@@ -17,25 +17,10 @@ use GalaxyOne\Tests\Support\IntegrationTestCase;
 
 final class SchemaManagerUpgradeTest extends IntegrationTestCase {
 
-	/**
-	 * Test delivery date.
-	 *
-	 * @var string
-	 */
 	private string $delivery_date;
 
-	/**
-	 * Test delivery slot key.
-	 *
-	 * @var string
-	 */
 	private string $slot_key;
 
-	/**
-	 * Runs before each test.
-	 *
-	 * @return void
-	 */
 	public function setUp(): void {
 		parent::setUp();
 
@@ -46,11 +31,6 @@ final class SchemaManagerUpgradeTest extends IntegrationTestCase {
 		update_option( 'galaxyone_core_schema_version', '0.9.0', false );
 	}
 
-	/**
-	 * Restores the approved atomicity schema after each test.
-	 *
-	 * @return void
-	 */
 	public function tearDown(): void {
 		$this->delete_test_rows();
 		update_option( 'galaxyone_core_schema_version', '0.8.0', false );
@@ -59,11 +39,6 @@ final class SchemaManagerUpgradeTest extends IntegrationTestCase {
 		parent::tearDown();
 	}
 
-	/**
-	 * Verifies a 0.7.0 installation receives notification logs and the complete approved upgrade path.
-	 *
-	 * @return void
-	 */
 	public function test_notification_log_schema_migrates_from_version_zero_point_seven(): void {
 		global $wpdb;
 
@@ -89,11 +64,6 @@ final class SchemaManagerUpgradeTest extends IntegrationTestCase {
 		self::assertTrue( $this->has_exact_idempotency_index() );
 	}
 
-	/**
-	 * Verifies an installation at 0.8.0 reaches 0.9.0 with a ready atomic schema.
-	 *
-	 * @return void
-	 */
 	public function test_upgrade_from_zero_point_eight_creates_repeatable_atomicity_schema(): void {
 		$this->prepare_legacy_delivery_schema();
 
@@ -121,11 +91,6 @@ final class SchemaManagerUpgradeTest extends IntegrationTestCase {
 		self::assertTrue( $this->has_exact_idempotency_index() );
 	}
 
-	/**
-	 * Verifies duplicate historical non-null idempotency keys block the migration.
-	 *
-	 * @return void
-	 */
 	public function test_duplicate_non_null_idempotency_keys_fail_closed(): void {
 		$this->prepare_legacy_delivery_schema();
 		$this->add_nullable_idempotency_column();
@@ -144,11 +109,6 @@ final class SchemaManagerUpgradeTest extends IntegrationTestCase {
 		self::assertFalse( $this->has_exact_idempotency_index() );
 	}
 
-	/**
-	 * Verifies unmatched active reservations block readiness and keep the version unchanged.
-	 *
-	 * @return void
-	 */
 	public function test_unmatched_active_reservation_blocks_atomicity_upgrade(): void {
 		$this->prepare_legacy_delivery_schema();
 
@@ -161,11 +121,25 @@ final class SchemaManagerUpgradeTest extends IntegrationTestCase {
 		self::assertFalse( $this->has_exact_idempotency_index() );
 	}
 
-	/**
-	 * Converts the test tables into the pre-0.9.0 delivery schema state.
-	 *
-	 * @return void
-	 */
+	public function test_unmatched_confirmed_reservation_blocks_atomicity_upgrade(): void {
+		$this->prepare_legacy_delivery_schema();
+
+		$pre_upgrade_version = (string) get_option( 'galaxyone_core_schema_version' );
+		$token               = wp_generate_uuid4();
+
+		$this->insert_reservation( $token, 'confirmed', 1, null );
+
+		SchemaManager::maybe_upgrade();
+
+		self::assertSame(
+			$pre_upgrade_version,
+			(string) get_option( 'galaxyone_core_schema_version' )
+		);
+		self::assertSame( 1, $this->get_reservation_count() );
+		self::assertSame( 'confirmed', $this->get_reservation_status( $token ) );
+		self::assertSame( 0, $this->get_capacity_row_count() );
+	}
+
 	private function prepare_legacy_delivery_schema(): void {
 		global $wpdb;
 
@@ -190,11 +164,6 @@ final class SchemaManagerUpgradeTest extends IntegrationTestCase {
 		update_option( 'galaxyone_core_schema_version', '0.8.0', false );
 	}
 
-	/**
-	 * Adds the nullable migration column without the unique index.
-	 *
-	 * @return void
-	 */
 	private function add_nullable_idempotency_column(): void {
 		global $wpdb;
 
@@ -210,13 +179,6 @@ final class SchemaManagerUpgradeTest extends IntegrationTestCase {
 		);
 	}
 
-	/**
-	 * Inserts a test capacity fixture.
-	 *
-	 * @param int $capacity       Configured capacity.
-	 * @param int $reserved_count Stored reserved count.
-	 * @return void
-	 */
 	private function insert_capacity( int $capacity, int $reserved_count ): void {
 		global $wpdb;
 
@@ -238,15 +200,6 @@ final class SchemaManagerUpgradeTest extends IntegrationTestCase {
 		);
 	}
 
-	/**
-	 * Inserts a historical reservation fixture.
-	 *
-	 * @param string      $token           Reservation token.
-	 * @param string      $status          Reservation status.
-	 * @param int         $quantity        Reserved quantity.
-	 * @param string|null $idempotency_key Historical idempotency key.
-	 * @return void
-	 */
 	private function insert_reservation(
 		string $token,
 		string $status,
@@ -276,11 +229,6 @@ final class SchemaManagerUpgradeTest extends IntegrationTestCase {
 		self::assertSame( 1, $wpdb->insert( $table_name, $data, $format ) );
 	}
 
-	/**
-	 * Removes test-owned delivery fixtures.
-	 *
-	 * @return void
-	 */
 	private function delete_test_rows(): void {
 		global $wpdb;
 
@@ -308,11 +256,6 @@ final class SchemaManagerUpgradeTest extends IntegrationTestCase {
 		); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 	}
 
-	/**
-	 * Drops the atomicity index when present.
-	 *
-	 * @return void
-	 */
 	private function drop_idempotency_index_if_present(): void {
 		global $wpdb;
 
@@ -330,11 +273,6 @@ final class SchemaManagerUpgradeTest extends IntegrationTestCase {
 		);
 	}
 
-	/**
-	 * Drops the atomicity column when present.
-	 *
-	 * @return void
-	 */
 	private function drop_idempotency_column_if_present(): void {
 		global $wpdb;
 
@@ -352,12 +290,6 @@ final class SchemaManagerUpgradeTest extends IntegrationTestCase {
 		);
 	}
 
-	/**
-	 * Returns the storage engine for a table.
-	 *
-	 * @param string $table_name Database table name.
-	 * @return string
-	 */
 	private function get_engine( string $table_name ): string {
 		global $wpdb;
 
@@ -374,11 +306,6 @@ final class SchemaManagerUpgradeTest extends IntegrationTestCase {
 			: '';
 	}
 
-	/**
-	 * Returns the idempotency-column type.
-	 *
-	 * @return string
-	 */
 	private function get_idempotency_column_type(): string {
 		global $wpdb;
 
@@ -393,11 +320,6 @@ final class SchemaManagerUpgradeTest extends IntegrationTestCase {
 			: '';
 	}
 
-	/**
-	 * Returns idempotency-column nullability.
-	 *
-	 * @return string
-	 */
 	private function get_idempotency_column_nullability(): string {
 		global $wpdb;
 
@@ -412,11 +334,6 @@ final class SchemaManagerUpgradeTest extends IntegrationTestCase {
 			: '';
 	}
 
-	/**
-	 * Determines whether the exact required unique index exists.
-	 *
-	 * @return bool
-	 */
 	private function has_exact_idempotency_index(): bool {
 		global $wpdb;
 
@@ -475,11 +392,6 @@ final class SchemaManagerUpgradeTest extends IntegrationTestCase {
 		return false;
 	}
 
-	/**
-	 * Returns test reservation rows with NULL idempotency keys.
-	 *
-	 * @return int
-	 */
 	private function get_historical_null_idempotency_count(): int {
 		global $wpdb;
 
@@ -498,11 +410,6 @@ final class SchemaManagerUpgradeTest extends IntegrationTestCase {
 		);
 	}
 
-	/**
-	 * Returns the number of test reservations.
-	 *
-	 * @return int
-	 */
 	private function get_reservation_count(): int {
 		global $wpdb;
 
@@ -520,11 +427,39 @@ final class SchemaManagerUpgradeTest extends IntegrationTestCase {
 		);
 	}
 
-	/**
-	 * Returns the test capacity reserved count.
-	 *
-	 * @return int
-	 */
+	private function get_reservation_status( string $token ): string {
+		global $wpdb;
+
+		$table_name = CreateDeliveryReservationsTable::get_table_name();
+
+		return (string) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT status
+				FROM {$table_name}
+				WHERE reservation_token = %s
+				LIMIT 1", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$token
+			)
+		);
+	}
+
+	private function get_capacity_row_count(): int {
+		global $wpdb;
+
+		$table_name = CreateDeliveryCapacityTable::get_table_name();
+
+		return (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*)
+				FROM {$table_name}
+				WHERE delivery_date = %s
+					AND slot_key = %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$this->delivery_date,
+				$this->slot_key
+			)
+		);
+	}
+
 	private function get_reserved_count(): int {
 		global $wpdb;
 
