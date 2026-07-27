@@ -41,7 +41,7 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 	private string $delivery_date;
 
 	/**
-	 * Unique delivery slot key.
+	 * Unique normalized delivery slot key.
 	 *
 	 * @var string
 	 */
@@ -62,11 +62,13 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 	public function setUp(): void {
 		parent::setUp();
 
-		$this->schema_option_existed = false !== get_option( 'galaxyone_core_schema_version', false );
+		$this->schema_option_existed   = false !== get_option( 'galaxyone_core_schema_version', false );
 		$this->previous_schema_version = get_option( 'galaxyone_core_schema_version', false );
-		$this->delivery_date          = gmdate( 'Y-m-d', time() + DAY_IN_SECONDS );
-		$this->slot_key               = 'atomicity-' . wp_generate_password( 10, false, false );
-		$this->postcode               = 'AT' . wp_rand( 100000, 999999 );
+		$this->delivery_date           = gmdate( 'Y-m-d', time() + DAY_IN_SECONDS );
+		$this->slot_key                = sanitize_title(
+			'atomicity-' . wp_generate_password( 10, false, false )
+		);
+		$this->postcode                = 'AT' . wp_rand( 100000, 999999 );
 
 		update_option( 'galaxyone_core_schema_version', '0.9.0', false );
 		$this->create_slot();
@@ -790,7 +792,7 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 	private function run_workers( array $payloads ): array {
 		$worker_file = __DIR__ . '/Support/DeliveryReservationConcurrencyWorker.php';
 		$directory   = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'galaxyone-workers-' . wp_generate_uuid4();
-		$processes   = array();
+		$workers     = array();
 
 		self::assertTrue( mkdir( $directory, 0700 ) );
 
@@ -821,36 +823,40 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 				stream_set_blocking( $pipes[1], false );
 				stream_set_blocking( $pipes[2], false );
 
-				$processes[] = array(
-					'process'   => $process,
-					'stdout'    => $pipes[1],
-					'stderr'    => $pipes[2],
-					'worker_id' => (string) $payload['worker_id'],
+				$workers[] = array(
+					'process' => $process,
+					'stdout'  => $pipes[1],
+					'stderr'  => $pipes[2],
+					'closed'  => false,
 				);
 			}
 
 			$deadline = microtime( true ) + 20;
 
 			while ( microtime( true ) < $deadline ) {
-				$ready = true;
+				$all_ready = true;
 
-				foreach ( $processes as $process ) {
-					if ( ! file_exists( $directory . DIRECTORY_SEPARATOR . $process['worker_id'] . '.ready' ) ) {
-						$ready = false;
+				foreach ( $payloads as $payload ) {
+					if (
+						! file_exists(
+							$directory . DIRECTORY_SEPARATOR . (string) $payload['worker_id'] . '.ready'
+						)
+					) {
+						$all_ready = false;
 						break;
 					}
 				}
 
-				if ( $ready ) {
+				if ( $all_ready ) {
 					break;
 				}
 
 				usleep( 10000 );
 			}
 
-			foreach ( $processes as $process ) {
+			foreach ( $payloads as $payload ) {
 				self::assertFileExists(
-					$directory . DIRECTORY_SEPARATOR . $process['worker_id'] . '.ready'
+					$directory . DIRECTORY_SEPARATOR . (string) $payload['worker_id'] . '.ready'
 				);
 			}
 
@@ -866,10 +872,12 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 			while ( microtime( true ) < $deadline ) {
 				$running = false;
 
-				foreach ( $processes as $process ) {
-					$status = proc_get_status( $process['process'] );
-
-					if ( true === $status['running'] ) {
+				foreach ( $workers as $worker ) {
+					if (
+						! $worker['closed'] &&
+						is_resource( $worker['process'] ) &&
+						true === proc_get_status( $worker['process'] )['running']
+					) {
 						$running = true;
 						break;
 					}
@@ -884,39 +892,14 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 
 			$results = array();
 
-			foreach ( $processes as $process ) {
-				$status = proc_get_status( $process['process'] );
-
-				if ( true === $status['running'] ) {
-					proc_terminate( $process['process'] );
-					self::fail( 'A delivery concurrency worker exceeded the test timeout.' );
-				}
-
-				$stdout = stream_get_contents( $process['stdout'] );
-				$stderr = stream_get_contents( $process['stderr'] );
-
-				fclose( $process['stdout'] );
-				fclose( $process['stderr'] );
-
-				$exit_code = proc_close( $process['process'] );
-				$result    = is_string( $stdout ) ? json_decode( $stdout, true ) : null;
-
-				self::assertIsArray( $result, (string) $stderr );
-
-				$results[] = array(
-					'exit_code' => $exit_code,
-					'result'    => $result,
-				);
+			foreach ( $workers as $index => $worker ) {
+				$results[] = $this->collect_worker_result( $workers[ $index ] );
 			}
 
 			return $results;
 		} finally {
-			foreach ( $processes as $process ) {
-				$status = proc_get_status( $process['process'] );
-
-				if ( true === $status['running'] ) {
-					proc_terminate( $process['process'] );
-				}
+			foreach ( $workers as $index => $worker ) {
+				$this->finalize_worker( $workers[ $index ], true );
 			}
 
 			$files = glob( $directory . DIRECTORY_SEPARATOR . '*' );
@@ -933,6 +916,79 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 				rmdir( $directory );
 			}
 		}
+	}
+
+	/**
+	 * Collects one completed worker result and closes its resources.
+	 *
+	 * @param array<string, mixed> $worker Worker process state.
+	 * @return array<string, mixed>
+	 */
+	private function collect_worker_result( array &$worker ): array {
+		if (
+			! isset( $worker['process'] ) ||
+			! is_resource( $worker['process'] ) ||
+			true === $worker['closed']
+		) {
+			self::fail( 'A delivery concurrency worker was unavailable.' );
+		}
+
+		$status = proc_get_status( $worker['process'] );
+
+		if ( true === $status['running'] ) {
+			$this->finalize_worker( $worker, true );
+			self::fail( 'A delivery concurrency worker exceeded the test timeout.' );
+		}
+
+		$stdout = is_resource( $worker['stdout'] ) ? stream_get_contents( $worker['stdout'] ) : false;
+		$stderr = is_resource( $worker['stderr'] ) ? stream_get_contents( $worker['stderr'] ) : false;
+
+		$exit_code = $this->finalize_worker( $worker, false );
+		$result    = is_string( $stdout ) ? json_decode( $stdout, true ) : null;
+
+		self::assertIsArray( $result, is_string( $stderr ) ? $stderr : '' );
+
+		return array(
+			'exit_code' => $exit_code,
+			'result'    => $result,
+		);
+	}
+
+	/**
+	 * Terminates a worker when needed and finalizes every resource once.
+	 *
+	 * @param array<string, mixed> $worker    Worker process state.
+	 * @param bool                 $terminate Whether a running worker must be terminated.
+	 * @return int
+	 */
+	private function finalize_worker( array &$worker, bool $terminate ): int {
+		if ( true === $worker['closed'] ) {
+			return -1;
+		}
+
+		$exit_code = -1;
+
+		if ( isset( $worker['process'] ) && is_resource( $worker['process'] ) ) {
+			$status = proc_get_status( $worker['process'] );
+
+			if ( $terminate && true === $status['running'] ) {
+				proc_terminate( $worker['process'] );
+			}
+		}
+
+		foreach ( array( 'stdout', 'stderr' ) as $pipe_name ) {
+			if ( isset( $worker[ $pipe_name ] ) && is_resource( $worker[ $pipe_name ] ) ) {
+				fclose( $worker[ $pipe_name ] );
+			}
+		}
+
+		if ( isset( $worker['process'] ) && is_resource( $worker['process'] ) ) {
+			$exit_code = proc_close( $worker['process'] );
+		}
+
+		$worker['closed'] = true;
+
+		return $exit_code;
 	}
 
 	/**
