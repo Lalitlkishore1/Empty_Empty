@@ -989,4 +989,6 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 				$this->slot_key,
 				$this->postcode
 			)
-		); // phpcs:ignore Wordcontrol to=??
+		); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+	}
+}
