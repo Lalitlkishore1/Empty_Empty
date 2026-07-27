@@ -50,7 +50,9 @@ The integration suite uses WordPress and WooCommerce with a disposable MySQL dat
 
 - WooCommerce CRUD order creation;
 - notification-log table creation through `dbDelta()`;
-- upgrade from schema version `0.7.0` to `0.8.0`;
+- upgrade from schema version `0.7.0` to `0.9.0`, including notification-log migration coverage;
+- upgrade from schema version `0.8.0` to `0.9.0`;
+- delivery-atomicity migration coverage;
 - one notification log per order and event;
 - safe persistence of failed and skipped notification results.
 
@@ -113,12 +115,14 @@ Record response time, largest contentful paint, total blocking time, and layout 
 
 1. Copy a non-production database at schema version `0.7.0`.
 2. Deploy the Phase 12 code to the non-production environment.
-3. Load WordPress once and confirm the schema option becomes `0.8.0`.
-4. Confirm the `galaxy_notification_logs` table exists.
-5. Run normal checkout, rewarded checkout, order-status updates, and notification logging.
-6. Restore a pre-upgrade backup into a separate non-production database.
-7. Confirm WordPress, WooCommerce, GalaxyOne Core, and the child theme load.
-8. Repeat the normal checkout smoke test and inspect stored order metadata.
+3. Load WordPress once and confirm the schema option becomes `0.9.0`.
+4. Confirm the `galaxy_notification_logs` table exists and notification-log migration coverage remains valid.
+5. Confirm the delivery-atomicity migration completes successfully.
+6. Repeat the upgrade using a separate non-production database at schema version `0.8.0` and confirm the schema option becomes `0.9.0` after the delivery-atomicity migration completes successfully.
+7. Run normal checkout, rewarded checkout, order-status updates, and notification logging.
+8. Restore a pre-upgrade backup into a separate non-production database.
+9. Confirm WordPress, WooCommerce, GalaxyOne Core, and the child theme load.
+10. Repeat the normal checkout smoke test and inspect stored order metadata.
 
 ## Required Evidence
 
