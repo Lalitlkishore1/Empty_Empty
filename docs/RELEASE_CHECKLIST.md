@@ -42,7 +42,9 @@ This checklist confirms Phase 12 validation readiness. It does not authorize or 
 
 ## Upgrade and Recovery
 
-- [ ] Upgrade from schema version `0.7.0` created the notification-log table and advanced schema version to `0.8.0`.
+- [ ] Upgrade from schema version `0.7.0` to `0.9.0` created the notification-log table and completed the delivery-atomicity migration.
+- [ ] Upgrade from schema version `0.8.0` to `0.9.0` completed the delivery-atomicity migration.
+- [ ] Release evidence confirms successful completion of both supported upgrade paths and the delivery-atomicity migration.
 - [ ] Re-running the migration created no duplicate table or records.
 - [ ] A non-production backup restoration completed successfully.
 - [ ] WordPress, WooCommerce, GalaxyOne Core, and the child theme loaded after restoration.
