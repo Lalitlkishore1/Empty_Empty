@@ -19,46 +19,16 @@ use WP_Error;
 
 final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 
-	/**
-	 * Test schema option value before the test.
-	 *
-	 * @var mixed
-	 */
 	private $previous_schema_version;
 
-	/**
-	 * Whether the schema option existed before the test.
-	 *
-	 * @var bool
-	 */
 	private bool $schema_option_existed = false;
 
-	/**
-	 * Unique delivery date.
-	 *
-	 * @var string
-	 */
 	private string $delivery_date;
 
-	/**
-	 * Unique normalized delivery slot key.
-	 *
-	 * @var string
-	 */
 	private string $slot_key;
 
-	/**
-	 * Unique postcode.
-	 *
-	 * @var string
-	 */
 	private string $postcode;
 
-	/**
-	 * Runs before each test.
-	 *
-	 * @return void
-	 */
 	public function setUp(): void {
 		parent::setUp();
 
@@ -74,11 +44,6 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 		$this->create_slot();
 	}
 
-	/**
-	 * Runs after each test.
-	 *
-	 * @return void
-	 */
 	public function tearDown(): void {
 		$this->cleanup_fixtures();
 
@@ -95,11 +60,6 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 		parent::tearDown();
 	}
 
-	/**
-	 * Verifies creation persists the capacity claim and active reservation together.
-	 *
-	 * @return void
-	 */
 	public function test_atomic_creation_persists_matching_capacity_and_reservation(): void {
 		$this->create_capacity( 1 );
 
@@ -117,11 +77,6 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 		self::assertSame( 1, $this->get_derived_reserved_quantity() );
 	}
 
-	/**
-	 * Verifies DeliveryValidationService uses the production reservation path.
-	 *
-	 * @return void
-	 */
 	public function test_validation_service_creates_reservation_using_server_operation_key(): void {
 		$this->create_capacity( 1 );
 
@@ -151,11 +106,6 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 		self::assertSame( 1, $this->get_reservation_count( 'active' ) );
 	}
 
-	/**
-	 * Verifies an insert failure rolls back the preceding capacity claim.
-	 *
-	 * @return void
-	 */
 	public function test_reservation_insert_failure_rolls_back_capacity_claim(): void {
 		global $wpdb;
 
@@ -189,11 +139,6 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 		}
 	}
 
-	/**
-	 * Verifies a capacity-write failure creates no reservation.
-	 *
-	 * @return void
-	 */
 	public function test_capacity_update_failure_creates_no_reservation(): void {
 		global $wpdb;
 
@@ -227,11 +172,6 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 		}
 	}
 
-	/**
-	 * Verifies matching idempotency retries reuse the existing active reservation.
-	 *
-	 * @return void
-	 */
 	public function test_matching_idempotency_key_reuses_existing_reservation(): void {
 		$this->create_capacity( 1 );
 
@@ -257,11 +197,6 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 		self::assertSame( 1, $this->get_capacity()['reserved_count'] );
 	}
 
-	/**
-	 * Verifies conflicting and terminal idempotency reuse fails safely.
-	 *
-	 * @return void
-	 */
 	public function test_conflicting_confirmed_and_terminal_idempotency_reuse_fail_safely(): void {
 		$this->create_capacity( 2 );
 
@@ -325,11 +260,6 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 		self::assertSame( 1, $this->get_capacity()['reserved_count'] );
 	}
 
-	/**
-	 * Verifies release is exact, idempotent, and cannot underflow capacity.
-	 *
-	 * @return void
-	 */
 	public function test_release_decrements_once_and_never_makes_reserved_count_negative(): void {
 		$this->create_capacity( 1 );
 
@@ -349,11 +279,6 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 		self::assertSame( 0, $this->get_derived_reserved_quantity() );
 	}
 
-	/**
-	 * Verifies expiry decrements capacity once and cannot overwrite confirmation.
-	 *
-	 * @return void
-	 */
 	public function test_expiry_is_idempotent_and_cannot_overwrite_confirmation(): void {
 		global $wpdb;
 
@@ -402,11 +327,6 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 		self::assertSame( 1, $this->get_derived_reserved_quantity() );
 	}
 
-	/**
-	 * Verifies configured capacity cannot be reduced below current reservations.
-	 *
-	 * @return void
-	 */
 	public function test_capacity_configuration_cannot_fall_below_reserved_usage(): void {
 		$this->create_capacity( 2 );
 
@@ -430,11 +350,6 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 		self::assertSame( 1, $this->get_capacity()['reserved_count'] );
 	}
 
-	/**
-	 * Verifies capacity state matches active and confirmed reservation quantities.
-	 *
-	 * @return void
-	 */
 	public function test_reserved_count_matches_active_and_confirmed_reservations(): void {
 		$this->create_capacity( 3 );
 
@@ -467,11 +382,6 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 		);
 	}
 
-	/**
-	 * Verifies independent creates with distinct keys cannot both claim final capacity.
-	 *
-	 * @return void
-	 */
 	public function test_concurrent_distinct_keys_cannot_overbook_final_capacity(): void {
 		$this->create_capacity( 1 );
 
@@ -492,11 +402,6 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 		self::assertSame( 1, $this->get_capacity()['reserved_count'] );
 	}
 
-	/**
-	 * Verifies independent retries with one key persist exactly one reservation.
-	 *
-	 * @return void
-	 */
 	public function test_concurrent_same_key_reuses_one_reservation(): void {
 		$this->create_capacity( 1 );
 
@@ -519,11 +424,6 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 		self::assertSame( 1, $this->get_capacity()['reserved_count'] );
 	}
 
-	/**
-	 * Verifies concurrent releases decrement capacity exactly once.
-	 *
-	 * @return void
-	 */
 	public function test_concurrent_release_decrements_capacity_once(): void {
 		$this->create_capacity( 1 );
 
@@ -562,14 +462,7 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 		self::assertSame( 1, $this->get_reservation_count( 'released' ) );
 	}
 
-	/**
-	 * Verifies concurrent confirmation and expiry leave one coherent terminal state.
-	 *
-	 * @return void
-	 */
 	public function test_concurrent_confirmation_and_expiry_do_not_conflict(): void {
-		global $wpdb;
-
 		$this->create_capacity( 1 );
 
 		$reservation = DeliveryReservationService::create(
@@ -582,18 +475,9 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 
 		self::assertIsArray( $reservation );
 
-		$reservations_table = $wpdb->prefix . 'galaxy_delivery_reservations';
-		$wpdb->query(
-			$wpdb->prepare(
-				"UPDATE {$reservations_table}
-				SET expires_at = %s
-				WHERE reservation_token = %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-				gmdate( 'Y-m-d H:i:s', time() - MINUTE_IN_SECONDS ),
-				(string) $reservation['token']
-			)
-		); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$expires_at = '';
 
-		$this->run_workers(
+		$results = $this->run_workers(
 			array(
 				array(
 					'action'            => 'confirm',
@@ -605,19 +489,48 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 					'action'    => 'expire',
 					'worker_id' => 'expire',
 				),
-			)
+			),
+			function () use ( &$expires_at, $reservation ): void {
+				$expires_at = gmdate( 'Y-m-d H:i:s', time() + 10 );
+				$this->set_reservation_expiry( (string) $reservation['token'], $expires_at );
+			},
+			function ( string $directory, array $payloads ) use ( $reservation, &$expires_at ): void {
+				foreach ( $payloads as $payload ) {
+					self::assertFileExists(
+						$directory . DIRECTORY_SEPARATOR . (string) $payload['worker_id'] . '.operation-ready'
+					);
+				}
+
+				self::assertSame(
+					'active',
+					$this->get_reservation_status( (string) $reservation['token'] )
+				);
+				self::assertNotSame( '', $expires_at );
+				self::assertFalse(
+					$this->reservation_is_expired( (string) $reservation['token'] )
+				);
+
+				$this->wait_until_reservation_is_expired( (string) $reservation['token'] );
+			}
 		);
 
-		self::assertSame( 'expired', $this->get_reservation_status( (string) $reservation['token'] ) );
+		self::assertCount( 2, $results );
+		self::assertSame( 12, $results[0]['exit_code'] );
+		self::assertFalse( $results[0]['result']['success'] );
+		self::assertSame( 0, $results[1]['exit_code'] );
+		self::assertTrue( $results[1]['result']['success'] );
+		self::assertSame( 1, $results[1]['result']['expired'] );
+
+		self::assertSame(
+			'expired',
+			$this->get_reservation_status( (string) $reservation['token'] )
+		);
+		self::assertSame( 1, $this->get_reservation_count( 'expired' ) );
+		self::assertSame( 0, $this->get_reservation_count( 'confirmed' ) );
 		self::assertSame( 0, $this->get_capacity()['reserved_count'] );
 		self::assertSame( 0, $this->get_derived_reserved_quantity() );
 	}
 
-	/**
-	 * Creates an active every-day delivery slot.
-	 *
-	 * @return void
-	 */
 	private function create_slot(): void {
 		self::assertTrue(
 			DeliverySlotService::save_slot(
@@ -631,12 +544,6 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 		);
 	}
 
-	/**
-	 * Creates a capacity configuration through the production service.
-	 *
-	 * @param int $capacity Maximum delivery capacity.
-	 * @return void
-	 */
 	private function create_capacity( int $capacity ): void {
 		self::assertTrue(
 			DeliveryCapacityService::save_capacity(
@@ -647,13 +554,6 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 		);
 	}
 
-	/**
-	 * Creates a deterministic test-only database trigger.
-	 *
-	 * @param string $trigger_name Trigger name.
-	 * @param string $definition   Trigger definition after the trigger name.
-	 * @return void
-	 */
 	private function create_failure_trigger( string $trigger_name, string $definition ): void {
 		global $wpdb;
 
@@ -664,11 +564,6 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 		self::assertSame( 0, $created );
 	}
 
-	/**
-	 * Returns the configured capacity row.
-	 *
-	 * @return array<string, int>
-	 */
 	private function get_capacity(): array {
 		$capacity = DeliveryCapacityService::get_capacity(
 			$this->delivery_date,
@@ -680,12 +575,6 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 		return $capacity;
 	}
 
-	/**
-	 * Returns the count of reservations in an optional lifecycle state.
-	 *
-	 * @param string $status Optional reservation state.
-	 * @return int
-	 */
 	private function get_reservation_count( string $status = '' ): int {
 		global $wpdb;
 
@@ -718,11 +607,6 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 		);
 	}
 
-	/**
-	 * Returns the derived quantity of active and confirmed reservations.
-	 *
-	 * @return int
-	 */
 	private function get_derived_reserved_quantity(): int {
 		global $wpdb;
 
@@ -743,12 +627,6 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 		);
 	}
 
-	/**
-	 * Returns a reservation lifecycle status.
-	 *
-	 * @param string $reservation_token Reservation token.
-	 * @return string
-	 */
 	private function get_reservation_status( string $reservation_token ): string {
 		global $wpdb;
 
@@ -765,13 +643,55 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 		);
 	}
 
-	/**
-	 * Creates a worker create-operation payload.
-	 *
-	 * @param string $idempotency_key Stable operation key.
-	 * @param string $worker_id      Worker identifier.
-	 * @return array<string, mixed>
-	 */
+	private function set_reservation_expiry( string $reservation_token, string $expires_at ): void {
+		global $wpdb;
+
+		$table_name = $wpdb->prefix . 'galaxy_delivery_reservations';
+
+		self::assertSame(
+			1,
+			$wpdb->query(
+				$wpdb->prepare(
+					"UPDATE {$table_name}
+					SET expires_at = %s
+					WHERE reservation_token = %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+					$expires_at,
+					$reservation_token
+				)
+			)
+		); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+	}
+
+	private function reservation_is_expired( string $reservation_token ): bool {
+		global $wpdb;
+
+		$table_name = $wpdb->prefix . 'galaxy_delivery_reservations';
+
+		return '1' === (string) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT expires_at < UTC_TIMESTAMP()
+				FROM {$table_name}
+				WHERE reservation_token = %s
+				LIMIT 1", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$reservation_token
+			)
+		);
+	}
+
+	private function wait_until_reservation_is_expired( string $reservation_token ): void {
+		$deadline = microtime( true ) + 20;
+
+		while ( microtime( true ) < $deadline ) {
+			if ( $this->reservation_is_expired( $reservation_token ) ) {
+				return;
+			}
+
+			usleep( 10000 );
+		}
+
+		self::fail( 'The reservation did not reach its controlled expiry boundary.' );
+	}
+
 	private function create_worker_payload( string $idempotency_key, string $worker_id ): array {
 		return array(
 			'action'          => 'create',
@@ -783,30 +703,34 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 		);
 	}
 
-	/**
-	 * Runs independent worker processes from one coordinated start barrier.
-	 *
-	 * @param array<int, array<string, mixed>> $payloads Worker payloads.
-	 * @return array<int, array<string, mixed>>
-	 */
-	private function run_workers( array $payloads ): array {
-		$worker_file = __DIR__ . '/Support/DeliveryReservationConcurrencyWorker.php';
-		$directory   = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'galaxyone-workers-' . wp_generate_uuid4();
-		$workers     = array();
+	private function run_workers(
+		array $payloads,
+		?callable $before_start = null,
+		?callable $before_operation_start = null
+	): array {
+		$worker_file       = __DIR__ . '/Support/DeliveryReservationConcurrencyWorker.php';
+		$directory         = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'galaxyone-workers-' . wp_generate_uuid4();
+		$workers           = array();
+		$operation_barrier = null !== $before_operation_start;
 
 		self::assertTrue( mkdir( $directory, 0700 ) );
 
 		try {
 			foreach ( $payloads as $payload ) {
 				$payload['barrier_directory'] = $directory;
-				$encoded_payload               = base64_encode( (string) wp_json_encode( $payload ) );
-				$descriptor_spec               = array(
+
+				if ( $operation_barrier ) {
+					$payload['operation_barrier_directory'] = $directory;
+				}
+
+				$encoded_payload = base64_encode( (string) wp_json_encode( $payload ) );
+				$descriptor_spec = array(
 					0 => array( 'pipe', 'r' ),
 					1 => array( 'pipe', 'w' ),
 					2 => array( 'pipe', 'w' ),
 				);
-				$pipes                         = array();
-				$process                       = proc_open(
+				$pipes           = array();
+				$process         = proc_open(
 					array( PHP_BINARY, $worker_file, $encoded_payload ),
 					$descriptor_spec,
 					$pipes,
@@ -831,33 +755,10 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 				);
 			}
 
-			$deadline = microtime( true ) + 20;
+			$this->wait_for_worker_barrier( $directory, $payloads, '.ready' );
 
-			while ( microtime( true ) < $deadline ) {
-				$all_ready = true;
-
-				foreach ( $payloads as $payload ) {
-					if (
-						! file_exists(
-							$directory . DIRECTORY_SEPARATOR . (string) $payload['worker_id'] . '.ready'
-						)
-					) {
-						$all_ready = false;
-						break;
-					}
-				}
-
-				if ( $all_ready ) {
-					break;
-				}
-
-				usleep( 10000 );
-			}
-
-			foreach ( $payloads as $payload ) {
-				self::assertFileExists(
-					$directory . DIRECTORY_SEPARATOR . (string) $payload['worker_id'] . '.ready'
-				);
+			if ( null !== $before_start ) {
+				$before_start( $directory, $payloads );
 			}
 
 			self::assertNotFalse(
@@ -866,6 +767,23 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 					'start'
 				)
 			);
+
+			if ( $operation_barrier ) {
+				$this->wait_for_worker_barrier(
+					$directory,
+					$payloads,
+					'.operation-ready'
+				);
+
+				$before_operation_start( $directory, $payloads );
+
+				self::assertNotFalse(
+					file_put_contents(
+						$directory . DIRECTORY_SEPARATOR . 'operation-start',
+						'start'
+					)
+				);
+			}
 
 			$deadline = microtime( true ) + 30;
 
@@ -918,12 +836,47 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 		}
 	}
 
-	/**
-	 * Collects one completed worker result and closes its resources.
-	 *
-	 * @param array<string, mixed> $worker Worker process state.
-	 * @return array<string, mixed>
-	 */
+	private function wait_for_worker_barrier(
+		string $directory,
+		array $payloads,
+		string $suffix
+	): void {
+		$deadline = microtime( true ) + 20;
+
+		while ( microtime( true ) < $deadline ) {
+			$all_ready = true;
+
+			foreach ( $payloads as $payload ) {
+				if (
+					! file_exists(
+						$directory .
+						DIRECTORY_SEPARATOR .
+						(string) $payload['worker_id'] .
+						$suffix
+					)
+				) {
+					$all_ready = false;
+					break;
+				}
+			}
+
+			if ( $all_ready ) {
+				break;
+			}
+
+			usleep( 10000 );
+		}
+
+		foreach ( $payloads as $payload ) {
+			self::assertFileExists(
+				$directory .
+				DIRECTORY_SEPARATOR .
+				(string) $payload['worker_id'] .
+				$suffix
+			);
+		}
+	}
+
 	private function collect_worker_result( array &$worker ): array {
 		if (
 			! isset( $worker['process'] ) ||
@@ -954,13 +907,6 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 		);
 	}
 
-	/**
-	 * Terminates a worker when needed and finalizes every resource once.
-	 *
-	 * @param array<string, mixed> $worker    Worker process state.
-	 * @param bool                 $terminate Whether a running worker must be terminated.
-	 * @return int
-	 */
 	private function finalize_worker( array &$worker, bool $terminate ): int {
 		if ( true === $worker['closed'] ) {
 			return -1;
@@ -991,11 +937,6 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 		return $exit_code;
 	}
 
-	/**
-	 * Removes test-owned custom-table fixtures.
-	 *
-	 * @return void
-	 */
 	private function cleanup_fixtures(): void {
 		global $wpdb;
 
