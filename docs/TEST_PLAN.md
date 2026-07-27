@@ -114,7 +114,7 @@ Record response time, largest contentful paint, total blocking time, and layout 
 ## Upgrade and Restore Regression
 
 1. Copy a non-production database at schema version `0.7.0`.
-2. Deploy the Phase 12 code to the non-production environment.
+2. Deploy the current GalaxyOne codebase being validated by this test plan to the non-production environment.
 3. Load WordPress once and confirm the schema option becomes `0.9.0`.
 4. Confirm the `galaxy_notification_logs` table exists and notification-log migration coverage remains valid.
 5. Confirm the delivery-atomicity migration completes successfully.
