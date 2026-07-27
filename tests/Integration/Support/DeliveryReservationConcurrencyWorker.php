@@ -78,6 +78,48 @@ function galaxyone_worker_wait_for_start( string $directory, string $worker_id )
 	return false;
 }
 
+/**
+ * Waits at the optional test-only operation barrier.
+ *
+ * @param string $directory Coordination directory.
+ * @param string $worker_id Worker identifier.
+ * @return bool
+ */
+function galaxyone_worker_wait_for_operation_start( string $directory, string $worker_id ): bool {
+	$ready_file = $directory . DIRECTORY_SEPARATOR . $worker_id . '.operation-ready';
+	$start_file = $directory . DIRECTORY_SEPARATOR . 'operation-start';
+	$deadline   = microtime( true ) + 20;
+
+	if ( false === file_put_contents( $ready_file, 'ready' ) ) {
+		return false;
+	}
+
+	while ( microtime( true ) < $deadline ) {
+		if ( file_exists( $start_file ) ) {
+			return true;
+		}
+
+		usleep( 10000 );
+	}
+
+	return false;
+}
+
+/**
+ * Waits at the optional operation barrier when requested by an integration test.
+ *
+ * @param string $directory Coordination directory.
+ * @param string $worker_id Worker identifier.
+ * @return bool
+ */
+function galaxyone_worker_wait_for_optional_operation_start( string $directory, string $worker_id ): bool {
+	if ( '' === $directory ) {
+		return true;
+	}
+
+	return galaxyone_worker_wait_for_operation_start( $directory, $worker_id );
+}
+
 try {
 	$encoded_payload = isset( $argv[1] ) && is_string( $argv[1] ) ? $argv[1] : '';
 	$decoded_payload = base64_decode( $encoded_payload, true );
@@ -126,10 +168,19 @@ try {
 		: '';
 	$directory = galaxyone_worker_validate_directory( $payload['barrier_directory'] ?? null );
 
+	$operation_directory = '';
+
+	if ( array_key_exists( 'operation_barrier_directory', $payload ) ) {
+		$operation_directory = galaxyone_worker_validate_directory(
+			$payload['operation_barrier_directory']
+		);
+	}
+
 	if (
 		! in_array( $action, array( 'create', 'release', 'confirm', 'expire' ), true ) ||
 		'' === $worker_id ||
-		'' === $directory
+		'' === $directory ||
+		( array_key_exists( 'operation_barrier_directory', $payload ) && '' === $operation_directory )
 	) {
 		galaxyone_worker_exit(
 			GALAXYONE_WORKER_VALIDATION_FAILURE,
@@ -177,6 +228,21 @@ try {
 			);
 		}
 
+		if (
+			! galaxyone_worker_wait_for_optional_operation_start(
+				$operation_directory,
+				$worker_id
+			)
+		) {
+			galaxyone_worker_exit(
+				GALAXYONE_WORKER_UNEXPECTED_FAILURE,
+				array(
+					'success' => false,
+					'error'   => 'operation_start_timeout',
+				)
+			);
+		}
+
 		$reservation = DeliveryReservationService::create(
 			$delivery_date,
 			$slot_key,
@@ -209,6 +275,21 @@ try {
 			);
 		}
 
+		if (
+			! galaxyone_worker_wait_for_optional_operation_start(
+				$operation_directory,
+				$worker_id
+			)
+		) {
+			galaxyone_worker_exit(
+				GALAXYONE_WORKER_UNEXPECTED_FAILURE,
+				array(
+					'success' => false,
+					'error'   => 'operation_start_timeout',
+				)
+			);
+		}
+
 		$released = DeliveryReservationService::release( $reservation_token );
 
 		galaxyone_worker_exit(
@@ -235,6 +316,21 @@ try {
 			);
 		}
 
+		if (
+			! galaxyone_worker_wait_for_optional_operation_start(
+				$operation_directory,
+				$worker_id
+			)
+		) {
+			galaxyone_worker_exit(
+				GALAXYONE_WORKER_UNEXPECTED_FAILURE,
+				array(
+					'success' => false,
+					'error'   => 'operation_start_timeout',
+				)
+			);
+		}
+
 		$confirmed = DeliveryReservationService::assign_to_order(
 			$reservation_token,
 			$order_id
@@ -244,6 +340,21 @@ try {
 			$confirmed ? 0 : GALAXYONE_WORKER_SERVICE_FAILURE,
 			array(
 				'success' => $confirmed,
+			)
+		);
+	}
+
+	if (
+		! galaxyone_worker_wait_for_optional_operation_start(
+			$operation_directory,
+			$worker_id
+		)
+	) {
+		galaxyone_worker_exit(
+			GALAXYONE_WORKER_UNEXPECTED_FAILURE,
+			array(
+				'success' => false,
+				'error'   => 'operation_start_timeout',
 			)
 		);
 	}
