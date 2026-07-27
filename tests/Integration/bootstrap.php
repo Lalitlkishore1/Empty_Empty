@@ -54,3 +54,7 @@ tests_add_filter(
 );
 
 require_once $wp_tests_dir . '/includes/bootstrap.php';
+
+if ( ! defined( 'GALAXYONE_INTEGRATION_BOOTSTRAPPED' ) ) {
+	define( 'GALAXYONE_INTEGRATION_BOOTSTRAPPED', true );
+}
