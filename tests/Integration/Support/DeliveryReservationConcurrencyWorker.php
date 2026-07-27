@@ -23,7 +23,15 @@ const GALAXYONE_WORKER_UNEXPECTED_FAILURE = 13;
  * @return never
  */
 function galaxyone_worker_exit( int $exit_code, array $result ): never {
-	echo wp_json_encode( $result ) . PHP_EOL;
+	$encoded_result = function_exists( 'wp_json_encode' )
+		? wp_json_encode( $result )
+		: json_encode( $result );
+
+	if ( ! is_string( $encoded_result ) ) {
+		$encoded_result = '{"success":false,"error":"serialization_failure"}';
+	}
+
+	echo $encoded_result . PHP_EOL;
 	exit( $exit_code );
 }
 
