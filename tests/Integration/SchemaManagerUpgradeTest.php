@@ -60,6 +60,36 @@ final class SchemaManagerUpgradeTest extends IntegrationTestCase {
 	}
 
 	/**
+	 * Verifies a 0.7.0 installation receives notification logs and the complete approved upgrade path.
+	 *
+	 * @return void
+	 */
+	public function test_notification_log_schema_migrates_from_version_zero_point_seven(): void {
+		global $wpdb;
+
+		CreateNotificationLogTable::down();
+		update_option( 'galaxyone_core_schema_version', '0.7.0', false );
+
+		SchemaManager::maybe_upgrade();
+
+		$table_name = CreateNotificationLogTable::get_table_name();
+		$found_name = $wpdb->get_var(
+			$wpdb->prepare(
+				'SHOW TABLES LIKE %s',
+				$table_name
+			)
+		);
+
+		self::assertSame( $table_name, $found_name );
+		self::assertSame( '0.9.0', get_option( 'galaxyone_core_schema_version' ) );
+		self::assertSame( 'innodb', $this->get_engine( CreateDeliveryCapacityTable::get_table_name() ) );
+		self::assertSame( 'innodb', $this->get_engine( CreateDeliveryReservationsTable::get_table_name() ) );
+		self::assertSame( 'char(36)', $this->get_idempotency_column_type() );
+		self::assertSame( 'YES', $this->get_idempotency_column_nullability() );
+		self::assertTrue( $this->has_exact_idempotency_index() );
+	}
+
+	/**
 	 * Verifies an installation at 0.8.0 reaches 0.9.0 with a ready atomic schema.
 	 *
 	 * @return void
