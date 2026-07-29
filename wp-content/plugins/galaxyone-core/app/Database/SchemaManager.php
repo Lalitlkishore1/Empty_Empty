@@ -16,6 +16,7 @@ use GalaxyOne\Core\Database\Migrations\CreateNotificationLogTable;
 use GalaxyOne\Core\Database\Migrations\CreateOfferCampaignsTable;
 use GalaxyOne\Core\Database\Migrations\CreateRewardCampaignsTable;
 use GalaxyOne\Core\Database\Migrations\CreateRewardEventsTable;
+use GalaxyOne\Core\Database\Migrations\CreateSupportedStreetsTable;
 use GalaxyOne\Core\Database\Migrations\UpgradeDeliveryReservationAtomicity;
 
 final class SchemaManager {
@@ -77,11 +78,18 @@ final class SchemaManager {
 	private const DELIVERY_ATOMICITY_SCHEMA_VERSION = '0.9.0';
 
 	/**
+	 * Schema version that introduced supported streets.
+	 *
+	 * @var string
+	 */
+	private const SUPPORTED_STREETS_SCHEMA_VERSION = '0.10.0';
+
+	/**
 	 * Current database schema version.
 	 *
 	 * @var string
 	 */
-	private const CURRENT_SCHEMA_VERSION = self::DELIVERY_ATOMICITY_SCHEMA_VERSION;
+	private const CURRENT_SCHEMA_VERSION = self::SUPPORTED_STREETS_SCHEMA_VERSION;
 
 	/**
 	 * Initializes the schema during activation.
@@ -154,6 +162,13 @@ final class SchemaManager {
 			return;
 		}
 
+		if (
+			version_compare( $installed_version, self::SUPPORTED_STREETS_SCHEMA_VERSION, '<' ) &&
+			! CreateSupportedStreetsTable::up()
+		) {
+			return;
+		}
+
 		if ( version_compare( $installed_version, self::CURRENT_SCHEMA_VERSION, '<' ) ) {
 			update_option( self::OPTION_NAME, self::CURRENT_SCHEMA_VERSION, false );
 		}
@@ -173,6 +188,7 @@ final class SchemaManager {
 	 * @return void
 	 */
 	public static function uninstall(): void {
+		CreateSupportedStreetsTable::down();
 		CreateNotificationLogTable::down();
 		CreateRewardEventsTable::down();
 		CreateRewardCampaignsTable::down();
