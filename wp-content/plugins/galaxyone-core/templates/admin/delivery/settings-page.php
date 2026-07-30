@@ -18,6 +18,22 @@ defined( 'ABSPATH' ) || exit;
 		<div class="notice notice-error">
 			<p><?php esc_html_e( 'Delivery configuration could not be saved. Review the submitted values and try again.', 'galaxyone-core' ); ?></p>
 		</div>
+	<?php elseif ( 'supported_street_saved' === $notice ) : ?>
+		<div class="notice notice-success is-dismissible">
+			<p><?php esc_html_e( 'Supported street was added.', 'galaxyone-core' ); ?></p>
+		</div>
+	<?php elseif ( 'supported_street_duplicate' === $notice ) : ?>
+		<div class="notice notice-error">
+			<p><?php esc_html_e( 'That supported street already exists.', 'galaxyone-core' ); ?></p>
+		</div>
+	<?php elseif ( 'supported_street_invalid' === $notice ) : ?>
+		<div class="notice notice-error">
+			<p><?php esc_html_e( 'The supported street could not be saved. Review the submitted values and try again.', 'galaxyone-core' ); ?></p>
+		</div>
+	<?php elseif ( 'supported_street_failed' === $notice ) : ?>
+		<div class="notice notice-error">
+			<p><?php esc_html_e( 'The supported street could not be saved. Please try again.', 'galaxyone-core' ); ?></p>
+		</div>
 	<?php endif; ?>
 
 	<h2><?php esc_html_e( 'Service Area', 'galaxyone-core' ); ?></h2>
@@ -66,6 +82,84 @@ defined( 'ABSPATH' ) || exit;
 			</tbody>
 		</table>
 	<?php endif; ?>
+
+	<hr>
+
+	<h2><?php esc_html_e( 'Supported Streets', 'galaxyone-core' ); ?></h2>
+	<form action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post">
+		<input type="hidden" name="action" value="galaxyone_save_delivery_configuration">
+		<input type="hidden" name="delivery_configuration_action" value="supported_street">
+		<?php wp_nonce_field( 'galaxyone_save_delivery_configuration', 'galaxyone_delivery_nonce' ); ?>
+
+		<table class="form-table" role="presentation">
+			<tbody>
+				<tr>
+					<th scope="row"><label for="galaxyone-supported-street-name"><?php esc_html_e( 'Street name', 'galaxyone-core' ); ?></label></th>
+					<td><input id="galaxyone-supported-street-name" name="street_name" type="text" maxlength="191" required></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="galaxyone-supported-street-locality"><?php esc_html_e( 'Locality', 'galaxyone-core' ); ?></label></th>
+					<td><input id="galaxyone-supported-street-locality" name="locality" type="text" maxlength="191" required></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="galaxyone-supported-street-service-area"><?php esc_html_e( 'Service area postcode', 'galaxyone-core' ); ?></label></th>
+					<td><input id="galaxyone-supported-street-service-area" name="service_area" type="text" maxlength="32"></td>
+				</tr>
+			</tbody>
+		</table>
+
+		<?php submit_button( __( 'Add Supported Street', 'galaxyone-core' ) ); ?>
+	</form>
+
+	<table class="widefat fixed striped">
+		<thead>
+			<tr>
+				<th scope="col"><?php esc_html_e( 'Street name', 'galaxyone-core' ); ?></th>
+				<th scope="col"><?php esc_html_e( 'Locality', 'galaxyone-core' ); ?></th>
+				<th scope="col"><?php esc_html_e( 'Service area', 'galaxyone-core' ); ?></th>
+			</tr>
+		</thead>
+		<tbody>
+			<?php if ( ! is_array( $supported_streets ) || empty( $supported_streets ) ) : ?>
+				<tr>
+					<td colspan="3"><?php esc_html_e( 'No supported streets have been added.', 'galaxyone-core' ); ?></td>
+				</tr>
+			<?php else : ?>
+				<?php foreach ( $supported_streets as $supported_street ) : ?>
+					<?php
+					$street_name = is_array( $supported_street ) &&
+						array_key_exists( 'street_name', $supported_street ) &&
+						is_scalar( $supported_street['street_name'] )
+						? (string) $supported_street['street_name']
+						: '';
+					$locality    = is_array( $supported_street ) &&
+						array_key_exists( 'locality', $supported_street ) &&
+						is_scalar( $supported_street['locality'] )
+						? (string) $supported_street['locality']
+						: '';
+					$service_area = is_array( $supported_street ) &&
+						array_key_exists( 'service_area', $supported_street ) &&
+						is_scalar( $supported_street['service_area'] )
+						? (string) $supported_street['service_area']
+						: '';
+					?>
+					<tr>
+						<td><?php echo esc_html( $street_name ); ?></td>
+						<td><?php echo esc_html( $locality ); ?></td>
+						<td>
+							<?php
+							echo esc_html(
+								'' === $service_area
+									? __( 'Not specified', 'galaxyone-core' )
+									: $service_area
+							);
+							?>
+						</td>
+					</tr>
+				<?php endforeach; ?>
+			<?php endif; ?>
+		</tbody>
+	</table>
 
 	<hr>
 
