@@ -25,9 +25,7 @@ final class SchemaManagerUpgradeTest extends IntegrationTestCase {
 		parent::setUp();
 
 		$this->delivery_date = gmdate( 'Y-m-d', time() + DAY_IN_SECONDS );
-		$this->slot_key      = sanitize_title(
-			'schema-atomicity-' . wp_generate_password( 10, false, false )
-		);
+		$this->slot_key      = 'schema-atomicity-' . wp_generate_password( 10, false, false );
 
 		$this->delete_test_rows();
 		update_option( 'galaxyone_core_schema_version', '0.9.0', false );
@@ -328,4 +326,155 @@ final class SchemaManagerUpgradeTest extends IntegrationTestCase {
 		$table_name = CreateDeliveryReservationsTable::get_table_name();
 		$column     = $wpdb->get_row(
 			"SHOW COLUMNS FROM {$table_name} LIKE 'idempotency_key'", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-			国产自拍
+			ARRAY_A
+		);
+
+		return is_array( $column ) && isset( $column['Null'] )
+			? strtoupper( (string) $column['Null'] )
+			: '';
+	}
+
+	private function has_exact_idempotency_index(): bool {
+		global $wpdb;
+
+		$table_name = CreateDeliveryReservationsTable::get_table_name();
+		$indexes    = $wpdb->get_results(
+			"SHOW INDEX FROM {$table_name}", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			ARRAY_A
+		);
+		$grouped    = array();
+
+		if ( ! is_array( $indexes ) ) {
+			return false;
+		}
+
+		foreach ( $indexes as $index ) {
+			if (
+				! is_array( $index ) ||
+				! isset( $index['Key_name'] ) ||
+				! is_scalar( $index['Key_name'] )
+			) {
+				return false;
+			}
+
+			$key_name = (string) $index['Key_name'];
+
+			if ( ! isset( $grouped[ $key_name ] ) ) {
+				$grouped[ $key_name ] = array();
+			}
+
+			$grouped[ $key_name ][] = $index;
+		}
+
+		foreach ( $grouped as $rows ) {
+			if ( 1 !== count( $rows ) ) {
+				continue;
+			}
+
+			$index = $rows[0];
+
+			if (
+				isset(
+					$index['Non_unique'],
+					$index['Column_name'],
+					$index['Seq_in_index']
+				) &&
+				'0' === (string) $index['Non_unique'] &&
+				'idempotency_key' === (string) $index['Column_name'] &&
+				'1' === (string) $index['Seq_in_index'] &&
+				array_key_exists( 'Sub_part', $index ) &&
+				null === $index['Sub_part']
+			) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	private function get_historical_null_idempotency_count(): int {
+		global $wpdb;
+
+		$table_name = CreateDeliveryReservationsTable::get_table_name();
+
+		return (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*)
+				FROM {$table_name}
+				WHERE delivery_date = %s
+					AND slot_key = %s
+					AND idempotency_key IS NULL", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$this->delivery_date,
+				$this->slot_key
+			)
+		);
+	}
+
+	private function get_reservation_count(): int {
+		global $wpdb;
+
+		$table_name = CreateDeliveryReservationsTable::get_table_name();
+
+		return (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*)
+				FROM {$table_name}
+				WHERE delivery_date = %s
+					AND slot_key = %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$this->delivery_date,
+				$this->slot_key
+			)
+		);
+	}
+
+	private function get_reservation_status( string $token ): string {
+		global $wpdb;
+
+		$table_name = CreateDeliveryReservationsTable::get_table_name();
+
+		return (string) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT status
+				FROM {$table_name}
+				WHERE reservation_token = %s
+				LIMIT 1", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$token
+			)
+		);
+	}
+
+	private function get_capacity_row_count(): int {
+		global $wpdb;
+
+		$table_name = CreateDeliveryCapacityTable::get_table_name();
+
+		return (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*)
+				FROM {$table_name}
+				WHERE delivery_date = %s
+					AND slot_key = %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$this->delivery_date,
+				$this->slot_key
+			)
+		);
+	}
+
+	private function get_reserved_count(): int {
+		global $wpdb;
+
+		$table_name = CreateDeliveryCapacityTable::get_table_name();
+
+		return (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT reserved_count
+				FROM {$table_name}
+				WHERE delivery_date = %s
+					AND slot_key = %s
+				LIMIT 1", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$this->delivery_date,
+				$this->slot_key
+			)
+		);
+	}
+}
