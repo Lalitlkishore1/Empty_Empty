@@ -12,9 +12,13 @@
     "squizlabs/php_codesniffer": "^3.10",
     "wp-coding-standards/wpcs": "^3.1"
   },
+  "autoload": {
+    "psr-4": {
+      "GalaxyOne\\Core\\": "wp-content/plugins/galaxyone-core/app/"
+    }
+  },
   "autoload-dev": {
     "psr-4": {
-      "GalaxyOne\\Core\\": "wp-content/plugins/galaxyone-core/app/",
       "GalaxyOne\\Tests\\": "tests/"
     }
   },
