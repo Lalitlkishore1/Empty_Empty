@@ -131,11 +131,12 @@ final class DeliveryModule implements ModuleInterface {
 			);
 		}
 
-		$notice        = isset( $_GET['galaxyone_notice'] ) && is_string( $_GET['galaxyone_notice'] ) // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$notice            = isset( $_GET['galaxyone_notice'] ) && is_string( $_GET['galaxyone_notice'] ) // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 			? sanitize_key( wp_unslash( $_GET['galaxyone_notice'] ) ) // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 			: '';
-		$service_areas = ServiceAreaService::get_service_areas();
-		$slots         = DeliverySlotService::get_slots();
+		$service_areas     = ServiceAreaService::get_service_areas();
+		$slots             = DeliverySlotService::get_slots();
+		$supported_streets = SupportedStreetRepository::get_active();
 
 		require GALAXYONE_CORE_PATH . 'templates/admin/delivery/settings-page.php';
 	}
@@ -200,6 +201,48 @@ final class DeliveryModule implements ModuleInterface {
 			}
 
 			$this->redirect( $saved ? 'saved' : 'invalid' );
+		}
+
+		if ( 'supported_street' === $configuration_action ) {
+			$street_name = isset( $_POST['street_name'] ) && is_string( $_POST['street_name'] ) // phpcs:ignore WordPress.Security.NonceVerification.Missing
+				? wp_unslash( $_POST['street_name'] ) // phpcs:ignore WordPress.Security.NonceVerification.Missing
+				: '';
+			$locality    = isset( $_POST['locality'] ) && is_string( $_POST['locality'] ) // phpcs:ignore WordPress.Security.NonceVerification.Missing
+				? wp_unslash( $_POST['locality'] ) // phpcs:ignore WordPress.Security.NonceVerification.Missing
+				: '';
+			$service_area = isset( $_POST['service_area'] ) && is_string( $_POST['service_area'] ) // phpcs:ignore WordPress.Security.NonceVerification.Missing
+				? wp_unslash( $_POST['service_area'] ) // phpcs:ignore WordPress.Security.NonceVerification.Missing
+				: '';
+			$street_id    = SupportedStreetRepository::create(
+				$street_name,
+				$locality,
+				$service_area
+			);
+
+			if ( is_int( $street_id ) && $street_id > 0 ) {
+				ActivityLogRepository::record(
+					'delivery_supported_street_created',
+					array(),
+					array(
+						'street_id' => $street_id,
+					),
+					array(
+						'source' => 'delivery_admin',
+					)
+				);
+
+				$this->redirect( 'supported_street_saved' );
+			}
+
+			if ( 0 === $street_id ) {
+				$this->redirect( 'supported_street_duplicate' );
+			}
+
+			if ( null === $street_id ) {
+				$this->redirect( 'supported_street_invalid' );
+			}
+
+			$this->redirect( 'supported_street_failed' );
 		}
 
 		if ( 'slot' === $configuration_action ) {
