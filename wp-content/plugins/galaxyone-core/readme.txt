@@ -22,7 +22,7 @@ This release includes:
 * Secure administration settings framework.
 * Administrator activity logging.
 
-No product, pricing, delivery, checkout, reward, customer, notification, dashboard, or presentation functionality is included in this release.
+The current release also registers product, delivery, cart, checkout, rewarded-ad, and notification integrations through WordPress and WooCommerce hooks.
 
 == Installation ==
 
