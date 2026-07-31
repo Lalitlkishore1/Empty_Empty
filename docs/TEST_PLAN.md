@@ -50,9 +50,10 @@ The integration suite uses WordPress and WooCommerce with a disposable MySQL dat
 
 - WooCommerce CRUD order creation;
 - notification-log table creation through `dbDelta()`;
-- upgrade from schema version `0.7.0` to `0.9.0`, including notification-log migration coverage;
-- upgrade from schema version `0.8.0` to `0.9.0`;
+- upgrade from schema version `0.7.0` to `0.10.0`, including notification-log migration coverage;
+- upgrade from schema version `0.8.0` to `0.10.0`;
 - delivery-atomicity migration coverage;
+- upgrade from schema version `0.9.0` to `0.10.0`, including Supported Streets migration coverage;
 - one notification log per order and event;
 - safe persistence of failed and skipped notification results.
 
@@ -115,14 +116,16 @@ Record response time, largest contentful paint, total blocking time, and layout 
 
 1. Copy a non-production database at schema version `0.7.0`.
 2. Deploy the current GalaxyOne codebase being validated by this test plan to the non-production environment.
-3. Load WordPress once and confirm the schema option becomes `0.9.0`.
+3. Load WordPress once and confirm the schema option becomes `0.10.0` after upgrading from `0.7.0`.
 4. Confirm the `galaxy_notification_logs` table exists and notification-log migration coverage remains valid.
 5. Confirm the delivery-atomicity migration completes successfully.
-6. Repeat the upgrade using a separate non-production database at schema version `0.8.0` and confirm the schema option becomes `0.9.0` after the delivery-atomicity migration completes successfully.
-7. Run normal checkout, rewarded checkout, order-status updates, and notification logging.
-8. Restore a pre-upgrade backup into a separate non-production database.
-9. Confirm WordPress, WooCommerce, GalaxyOne Core, and the child theme load.
-10. Repeat the normal checkout smoke test and inspect stored order metadata.
+6. Confirm the Supported Streets migration completes successfully and the `galaxy_supported_streets` table exists.
+7. Repeat the upgrade using a separate non-production database at schema version `0.8.0` and confirm the schema option becomes `0.10.0` after the delivery-atomicity and Supported Streets migrations complete successfully.
+8. Repeat the upgrade using a separate non-production database at schema version `0.9.0` and confirm the schema option becomes `0.10.0` after the Supported Streets migration completes successfully.
+9. Run normal checkout, rewarded checkout, order-status updates, and notification logging.
+10. Restore a pre-upgrade backup into a separate non-production database.
+11. Confirm WordPress, WooCommerce, GalaxyOne Core, and the child theme load.
+12. Repeat the normal checkout smoke test and inspect stored order metadata.
 
 ## Required Evidence
 
