@@ -7,6 +7,7 @@
 
 namespace GalaxyOne\Core\Checkout;
 
+use GalaxyOne\Core\Cart\CartRecalculationService;
 use GalaxyOne\Core\Delivery\DeliveryValidationService;
 use WP_Error;
 
@@ -32,15 +33,10 @@ final class CheckoutValidationService {
 			);
 		}
 
-		$postcode = isset( $data['billing_postcode'] ) && is_scalar( $data['billing_postcode'] )
-			? (string) $data['billing_postcode']
-			: '';
-		$date     = isset( $data['galaxyone_delivery_date'] ) && is_scalar( $data['galaxyone_delivery_date'] )
-			? (string) $data['galaxyone_delivery_date']
-			: '';
-		$slot_key = isset( $data['galaxyone_delivery_slot'] ) && is_scalar( $data['galaxyone_delivery_slot'] )
-			? (string) $data['galaxyone_delivery_slot']
-			: '';
+		$selection = CartRecalculationService::get_delivery_selection();
+		$postcode  = (string) $selection['postcode'];
+		$date      = (string) $selection['delivery_date'];
+		$slot_key  = (string) $selection['slot_key'];
 
 		if ( '' === trim( $date ) || '' === trim( $slot_key ) ) {
 			$errors[] = new WP_Error(
@@ -53,7 +49,9 @@ final class CheckoutValidationService {
 
 		$delivery_validation = DeliveryValidationService::validate(
 			array(
-				'postcode' => $postcode,
+				'address_1' => (string) $selection['address_1'],
+				'city'      => (string) $selection['city'],
+				'postcode'  => $postcode,
 			),
 			$date,
 			$slot_key
