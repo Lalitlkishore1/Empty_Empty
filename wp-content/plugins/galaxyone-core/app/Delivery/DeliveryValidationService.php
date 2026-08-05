@@ -33,12 +33,34 @@ final class DeliveryValidationService {
 		$postcode      = isset( $address['postcode'] ) && is_scalar( $address['postcode'] )
 			? (string) $address['postcode']
 			: '';
+		$street_name   = isset( $address['address_1'] ) && is_scalar( $address['address_1'] )
+			? (string) $address['address_1']
+			: '';
+		$locality      = isset( $address['city'] ) && is_scalar( $address['city'] )
+			? (string) $address['city']
+			: '';
 		$area          = ServiceAreaService::get_service_area( $postcode );
 
 		if ( ! is_array( $area ) ) {
 			return new WP_Error(
 				'galaxyone_delivery_out_of_area',
 				__( 'Delivery is not available for the supplied postcode.', 'galaxyone-core' )
+			);
+		}
+
+		if (
+			'' === trim( $street_name ) ||
+			'' === trim( $locality ) ||
+			'' === trim( $postcode ) ||
+			! SupportedStreetRepository::is_active_supported_street(
+				$street_name,
+				$locality,
+				$postcode
+			)
+		) {
+			return new WP_Error(
+				'galaxyone_delivery_unsupported_street',
+				__( 'Delivery is not available for the supplied address.', 'galaxyone-core' )
 			);
 		}
 
