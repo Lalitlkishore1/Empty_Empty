@@ -111,7 +111,9 @@ final class CartRecalculationService {
 
 		$validation = DeliveryValidationService::validate(
 			array(
-				'postcode' => (string) $selection['postcode'],
+				'address_1' => (string) $selection['address_1'],
+				'city'      => (string) $selection['city'],
+				'postcode'  => (string) $selection['postcode'],
 			),
 			(string) $selection['delivery_date'],
 			(string) $selection['slot_key']
@@ -154,17 +156,23 @@ final class CartRecalculationService {
 	 * @param string $postcode      Selected postcode.
 	 * @param string $delivery_date Selected date.
 	 * @param string $slot_key      Selected slot key.
+	 * @param string $address_1     Selected delivery address line.
+	 * @param string $city          Selected delivery locality.
 	 * @return void
 	 */
 	public static function update_delivery_selection(
 		string $postcode,
 		string $delivery_date,
-		string $slot_key
+		string $slot_key,
+		string $address_1 = '',
+		string $city = ''
 	): void {
 		$selection = array(
 			'postcode'      => strtoupper( preg_replace( '/\s+/', '', sanitize_text_field( $postcode ) ) ),
 			'delivery_date' => sanitize_text_field( $delivery_date ),
 			'slot_key'      => sanitize_title( $slot_key ),
+			'address_1'     => sanitize_text_field( $address_1 ),
+			'city'          => sanitize_text_field( $city ),
 		);
 		$current   = self::get_delivery_selection();
 
@@ -195,6 +203,8 @@ final class CartRecalculationService {
 				'postcode'      => '',
 				'delivery_date' => '',
 				'slot_key'      => '',
+				'address_1'     => '',
+				'city'          => '',
 			);
 		}
 
@@ -207,6 +217,12 @@ final class CartRecalculationService {
 				: '',
 			'slot_key'      => isset( $selection['slot_key'] ) && is_scalar( $selection['slot_key'] )
 				? sanitize_title( (string) $selection['slot_key'] )
+				: '',
+			'address_1'     => isset( $selection['address_1'] ) && is_scalar( $selection['address_1'] )
+				? sanitize_text_field( (string) $selection['address_1'] )
+				: '',
+			'city'          => isset( $selection['city'] ) && is_scalar( $selection['city'] )
+				? sanitize_text_field( (string) $selection['city'] )
 				: '',
 		);
 	}
@@ -278,7 +294,9 @@ final class CartRecalculationService {
 
 		$reservation = DeliveryValidationService::reserve(
 			array(
-				'postcode' => (string) $selection['postcode'],
+				'address_1' => (string) $selection['address_1'],
+				'city'      => (string) $selection['city'],
+				'postcode'  => (string) $selection['postcode'],
 			),
 			(string) $selection['delivery_date'],
 			(string) $selection['slot_key'],
