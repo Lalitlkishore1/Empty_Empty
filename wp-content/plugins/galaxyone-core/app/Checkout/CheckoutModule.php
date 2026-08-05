@@ -5,6 +5,8 @@
  * @package GalaxyOne\Core\Checkout
  */
 
+declare(strict_types=1);
+
 namespace GalaxyOne\Core\Checkout;
 
 use DateInterval;
@@ -14,182 +16,154 @@ use GalaxyOne\Core\Cart\CartValidationService;
 use GalaxyOne\Core\Contracts\ModuleInterface;
 use GalaxyOne\Core\Delivery\DeliverySlotService;
 use GalaxyOne\Core\Orders\OrderMetaService;
-use GalaxyOne\Core\Orders\OrderStatusService;
+use GalaxyOne\Core\Orders\OrderStatus;
 use WC_Order;
 use WC_Order_Item_Product;
 use WP_Error;
 
+/**
+ * Integrates GalaxyOne checkout requirements with WooCommerce.
+ */
 final class CheckoutModule implements ModuleInterface {
-
 	/**
-	 * Registers checkout integrations.
+	 * Register checkout hooks.
 	 *
 	 * @return void
 	 */
 	public function register(): void {
-		add_filter(
-			'woocommerce_checkout_fields',
-			array( $this, 'configure_checkout_fields' )
-		);
-
-		add_action(
-			'woocommerce_after_order_notes',
-			array( $this, 'render_delivery_selection' )
-		);
-
-		add_action(
-			'woocommerce_checkout_update_order_review',
-			array( $this, 'capture_delivery_selection' )
-		);
-
-		add_action(
-			'woocommerce_after_checkout_validation',
-			array( $this, 'validate_checkout' ),
-			20,
-			2
-		);
-
-		add_action(
-			'woocommerce_checkout_create_order_line_item',
-			array( $this, 'store_order_item_snapshot' ),
-			20,
-			4
-		);
-
-		add_action(
-			'woocommerce_checkout_create_order',
-			array( $this, 'store_order_metadata' ),
-			20,
-			2
-		);
-
-		add_action(
-			'woocommerce_checkout_order_created',
-			array( $this, 'confirm_delivery_reservation' )
-		);
-
-		add_filter(
-			'woocommerce_payment_gateways',
-			array( $this, 'register_payment_gateways' )
-		);
-
-		OrderStatusService::register_hooks();
+		add_filter( 'woocommerce_checkout_fields', array( $this, 'configure_checkout_fields' ) );
+		add_action( 'woocommerce_after_order_notes', array( $this, 'render_delivery_selection' ) );
+		add_action( 'woocommerce_checkout_update_order_review', array( $this, 'capture_delivery_selection' ) );
+		add_action( 'woocommerce_after_checkout_validation', array( $this, 'validate_checkout' ), 10, 2 );
+		add_action( 'woocommerce_checkout_create_order_line_item', array( $this, 'store_order_item_snapshot' ), 10, 4 );
+		add_action( 'woocommerce_checkout_create_order', array( $this, 'store_order_metadata' ), 10, 2 );
+		add_action( 'woocommerce_checkout_order_processed', array( $this, 'confirm_delivery_reservation' ), 10, 3 );
+		add_filter( 'woocommerce_payment_gateways', array( $this, 'register_payment_gateways' ) );
 	}
 
 	/**
-	 * Requires the mobile number and adds the optional delivery landmark field.
+	 * Configure the core checkout fields used by GalaxyOne.
 	 *
-	 * @param array<string, array<string, array<string, mixed>>> $fields Checkout fields.
-	 * @return array<string, array<string, array<string, mixed>>>
+	 * @param array<string, mixed> $fields Checkout fields.
+	 * @return array<string, mixed>
 	 */
 	public function configure_checkout_fields( array $fields ): array {
-		if ( isset( $fields['billing']['billing_phone'] ) ) {
-			$fields['billing']['billing_phone']['required'] = true;
-			$fields['billing']['billing_phone']['label']    = __( 'Mobile number', 'galaxyone-core' );
+		if ( isset( $fields['billing']['billing_postcode'] ) ) {
+			$fields['billing']['billing_postcode']['required'] = true;
 		}
-
-		$fields['order']['galaxyone_landmark'] = array(
-			'type'        => 'text',
-			'label'       => __( 'Landmark', 'galaxyone-core' ),
-			'required'    => false,
-			'priority'    => 25,
-			'autocomplete' => 'address-line2',
-		);
 
 		return $fields;
 	}
 
 	/**
-	 * Renders the checkout delivery-selection fields.
+	 * Render the delivery selection fields.
 	 *
-	 * @param WC_Checkout $checkout WooCommerce checkout object.
+	 * @param object $checkout WooCommerce checkout object.
 	 * @return void
 	 */
-	public function render_delivery_selection( $checkout ): void {
-		unset( $checkout );
+	public function render_delivery_selection( object $checkout ): void {
+		$selection = CartRecalculationService::get_delivery_selection();
+		$options   = $this->get_delivery_options();
 
-		$selection        = CartRecalculationService::get_delivery_selection();
-		$delivery_options = $this->get_delivery_options();
+		$template = GALAXYONE_CORE_PATH . 'templates/checkout/delivery-selection.php';
 
-		require GALAXYONE_CORE_PATH . 'templates/frontend/checkout/delivery-selection.php';
-	}
-
-	/**
-	 * Captures checkout-update values using WooCommerce's protected checkout request.
-	 *
-	 * @param string $posted_data Serialized checkout fields.
-	 * @return void
-	 */
-	public function capture_delivery_selection( string $posted_data ): void {
-		$fields = array();
-
-		wp_parse_str( $posted_data, $fields );
-
-		$postcode = isset( $fields['billing_postcode'] ) && is_scalar( $fields['billing_postcode'] )
-			? (string) $fields['billing_postcode']
-			: '';
-		$date     = isset( $fields['galaxyone_delivery_date'] ) && is_scalar( $fields['galaxyone_delivery_date'] )
-			? (string) $fields['galaxyone_delivery_date']
-			: '';
-		$slot_key = isset( $fields['galaxyone_delivery_slot'] ) && is_scalar( $fields['galaxyone_delivery_slot'] )
-			? (string) $fields['galaxyone_delivery_slot']
-			: '';
-
-		CartRecalculationService::update_delivery_selection( $postcode, $date, $slot_key );
-	}
-
-	/**
-	 * Performs final cart and checkout validation before order creation.
-	 *
-	 * @param array<string, mixed> $data   Validated WooCommerce checkout values.
-	 * @param WP_Error             $errors WooCommerce validation errors.
-	 * @return void
-	 */
-	public function validate_checkout( array $data, WP_Error $errors ): void {
-		$postcode = isset( $data['billing_postcode'] ) && is_scalar( $data['billing_postcode'] )
-			? (string) $data['billing_postcode']
-			: '';
-		$date     = isset( $_POST['galaxyone_delivery_date'] ) && is_string( $_POST['galaxyone_delivery_date'] ) // phpcs:ignore WordPress.Security.NonceVerification.Missing
-			? sanitize_text_field( wp_unslash( $_POST['galaxyone_delivery_date'] ) ) // phpcs:ignore WordPress.Security.NonceVerification.Missing
-			: '';
-		$slot_key = isset( $_POST['galaxyone_delivery_slot'] ) && is_string( $_POST['galaxyone_delivery_slot'] ) // phpcs:ignore WordPress.Security.NonceVerification.Missing
-			? sanitize_title( wp_unslash( $_POST['galaxyone_delivery_slot'] ) ) // phpcs:ignore WordPress.Security.NonceVerification.Missing
-			: '';
-
-		$data['galaxyone_delivery_date'] = $date;
-		$data['galaxyone_delivery_slot'] = $slot_key;
-
-		CartRecalculationService::update_delivery_selection( $postcode, $date, $slot_key );
-
-		foreach ( CartValidationService::validate_cart() as $error ) {
-			$errors->add( $error->get_error_code(), $error->get_error_message() );
-		}
-
-		foreach ( CheckoutValidationService::validate( $data ) as $error ) {
-			$errors->add( $error->get_error_code(), $error->get_error_message() );
-		}
-
-		if ( $errors->has_errors() ) {
+		if ( ! file_exists( $template ) ) {
 			return;
 		}
 
-		$reservation = CartRecalculationService::reserve_delivery_selection();
+		require $template;
+	}
 
-		if ( $reservation instanceof WP_Error ) {
+	/**
+	 * Capture delivery selection when WooCommerce updates checkout totals.
+	 *
+	 * @param string $posted_data Serialized checkout data.
+	 * @return void
+	 */
+	public function capture_delivery_selection( string $posted_data ): void {
+		parse_str( $posted_data, $fields );
+
+		if ( ! is_array( $fields ) ) {
+			return;
+		}
+
+		$postcode  = isset( $fields['billing_postcode'] ) && is_scalar( $fields['billing_postcode'] )
+			? sanitize_text_field( (string) $fields['billing_postcode'] )
+			: '';
+		$address_1 = isset( $fields['billing_address_1'] ) && is_scalar( $fields['billing_address_1'] )
+			? sanitize_text_field( (string) $fields['billing_address_1'] )
+			: '';
+		$city      = isset( $fields['billing_city'] ) && is_scalar( $fields['billing_city'] )
+			? sanitize_text_field( (string) $fields['billing_city'] )
+			: '';
+		$date      = isset( $fields['galaxyone_delivery_date'] ) && is_scalar( $fields['galaxyone_delivery_date'] )
+			? (string) $fields['galaxyone_delivery_date']
+			: '';
+		$slot_key  = isset( $fields['galaxyone_delivery_slot'] ) && is_scalar( $fields['galaxyone_delivery_slot'] )
+			? (string) $fields['galaxyone_delivery_slot']
+			: '';
+
+		CartRecalculationService::update_delivery_selection(
+			$postcode,
+			$date,
+			$slot_key,
+			$address_1,
+			$city
+		);
+	}
+
+	/**
+	 * Validate the final checkout submission.
+	 *
+	 * @param array<string, mixed> $data   Checkout data.
+	 * @param WP_Error             $errors Validation errors.
+	 * @return void
+	 */
+	public function validate_checkout( array $data, WP_Error $errors ): void {
+		$postcode  = isset( $data['billing_postcode'] ) && is_scalar( $data['billing_postcode'] )
+			? sanitize_text_field( (string) $data['billing_postcode'] )
+			: '';
+		$address_1 = isset( $data['billing_address_1'] ) && is_scalar( $data['billing_address_1'] )
+			? sanitize_text_field( (string) $data['billing_address_1'] )
+			: '';
+		$city      = isset( $data['billing_city'] ) && is_scalar( $data['billing_city'] )
+			? sanitize_text_field( (string) $data['billing_city'] )
+			: '';
+
+		// Delivery fields are rendered by the GalaxyOne template, not registered
+		// WooCommerce checkout fields, so read and sanitize them directly.
+		$date = isset( $_POST['galaxyone_delivery_date'] ) && is_scalar( $_POST['galaxyone_delivery_date'] ) // phpcs:ignore WordPress.Security.NonceVerification.Missing -- WooCommerce validates the checkout request.
+			? sanitize_text_field( wp_unslash( (string) $_POST['galaxyone_delivery_date'] ) ) // phpcs:ignore WordPress.Security.NonceVerification.Missing -- WooCommerce validates the checkout request.
+			: '';
+		$slot_key = isset( $_POST['galaxyone_delivery_slot'] ) && is_scalar( $_POST['galaxyone_delivery_slot'] ) // phpcs:ignore WordPress.Security.NonceVerification.Missing -- WooCommerce validates the checkout request.
+			? sanitize_key( wp_unslash( (string) $_POST['galaxyone_delivery_slot'] ) ) // phpcs:ignore WordPress.Security.NonceVerification.Missing -- WooCommerce validates the checkout request.
+			: '';
+
+		CartRecalculationService::update_delivery_selection(
+			$postcode,
+			$date,
+			$slot_key,
+			$address_1,
+			$city
+		);
+
+		$result = CheckoutValidationService::validate( $postcode, $date, $slot_key );
+
+		if ( ! $result['valid'] ) {
 			$errors->add(
-				$reservation->get_error_code(),
-				$reservation->get_error_message()
+				'galaxyone_checkout_validation',
+				(string) $result['message']
 			);
 		}
 	}
 
 	/**
-	 * Stores the authoritative price snapshot on an order item.
+	 * Store the authoritative price snapshot on each order item.
 	 *
 	 * @param WC_Order_Item_Product $item          Order item.
 	 * @param string                $cart_item_key Cart item key.
 	 * @param array<string, mixed>  $values        Cart item values.
-	 * @param WC_Order              $order         WooCommerce order.
+	 * @param WC_Order              $order         Order.
 	 * @return void
 	 */
 	public function store_order_item_snapshot(
@@ -198,81 +172,134 @@ final class CheckoutModule implements ModuleInterface {
 		array $values,
 		WC_Order $order
 	): void {
-		unset( $cart_item_key, $order );
+		if ( ! isset( $values['data'] ) || ! is_object( $values['data'] ) ) {
+			return;
+		}
 
-		OrderMetaService::store_line_item_snapshot( $item, $values );
+		$product = $values['data'];
+
+		if ( ! method_exists( $product, 'get_id' ) ) {
+			return;
+		}
+
+		$product_id = (int) $product->get_id();
+
+		if ( $product_id <= 0 ) {
+			return;
+		}
+
+		$context = CartRecalculationService::get_product_price_context( $cart_item_key );
+
+		if ( null === $context ) {
+			return;
+		}
+
+		$item->update_meta_data( '_galaxyone_product_id', $product_id );
+		$item->update_meta_data( '_galaxyone_price_snapshot', $context['price'] );
+		$item->update_meta_data( '_galaxyone_price_source', $context['source'] );
+		$item->update_meta_data( '_galaxyone_campaign_id', $context['campaign_id'] );
+
+		if ( '' !== $context['reward_event_token'] ) {
+			$item->update_meta_data( '_galaxyone_reward_event_token', $context['reward_event_token'] );
+		}
 	}
 
 	/**
-	 * Persists final checkout metadata on the order.
+	 * Store delivery and pricing metadata on the order.
 	 *
-	 * @param WC_Order             $order WooCommerce order.
-	 * @param array<string, mixed> $data  Validated checkout data.
+	 * @param WC_Order             $order Order.
+	 * @param array<string, mixed> $data  Checkout data.
 	 * @return void
 	 */
 	public function store_order_metadata( WC_Order $order, array $data ): void {
-		OrderMetaService::store_checkout_metadata( $order, $data );
+		$selection = CartRecalculationService::get_delivery_selection();
+
+		if ( ! empty( $selection['reservation_token'] ) ) {
+			$order->update_meta_data(
+				OrderMetaService::DELIVERY_RESERVATION_TOKEN,
+				(string) $selection['reservation_token']
+			);
+		}
+
+		if ( ! empty( $selection['delivery_date'] ) ) {
+			$order->update_meta_data(
+				OrderMetaService::DELIVERY_DATE,
+				(string) $selection['delivery_date']
+			);
+		}
+
+		if ( ! empty( $selection['slot_key'] ) ) {
+			$order->update_meta_data(
+				OrderMetaService::DELIVERY_SLOT_KEY,
+				(string) $selection['slot_key']
+			);
+		}
+
+		$order->update_meta_data(
+			OrderMetaService::DELIVERY_FEE,
+			CartRecalculationService::get_delivery_fee()
+		);
 	}
 
 	/**
-	 * Assigns the provisional capacity reservation to the created order.
+	 * Confirm the delivery reservation once WooCommerce creates the order.
 	 *
-	 * @param WC_Order $order WooCommerce order.
+	 * @param int                  $order_id Order ID.
+	 * @param array<string, mixed> $data     Checkout data.
+	 * @param WC_Order             $order    Order.
 	 * @return void
 	 */
-	public function confirm_delivery_reservation( WC_Order $order ): void {
-		OrderMetaService::confirm_delivery_reservation( $order );
+	public function confirm_delivery_reservation( int $order_id, array $data, WC_Order $order ): void {
+		$reservation_token = (string) $order->get_meta( OrderMetaService::DELIVERY_RESERVATION_TOKEN );
+
+		if ( '' === $reservation_token ) {
+			return;
+		}
+
+		DeliveryReservationService::confirm( $reservation_token, $order_id );
+		CartRecalculationService::clear_delivery_selection();
 	}
 
 	/**
-	 * Registers the UPI-on-delivery payment gateway.
+	 * Register GalaxyOne payment gateways.
 	 *
-	 * @param array<int, string> $gateways Payment gateway class names.
+	 * @param array<int, string> $gateways Gateway class names.
 	 * @return array<int, string>
 	 */
 	public function register_payment_gateways( array $gateways ): array {
-		$gateways[] = UpiOnDeliveryGateway::class;
+		$gateways[] = GalaxyOneCodGateway::class;
 
 		return $gateways;
 	}
 
 	/**
-	 * Returns selectable upcoming dates and currently available slots.
+	 * Get delivery-date and slot options for checkout rendering.
 	 *
-	 * @return array<int, array<string, mixed>>
+	 * @return array<string, mixed>
 	 */
 	private function get_delivery_options(): array {
-		$options      = array();
-		$current_date = new DateTimeImmutable( 'today', wp_timezone() );
-		$slots        = DeliverySlotService::get_slots();
+		$options = array(
+			'dates' => array(),
+			'slots' => array(),
+		);
 
-		for ( $offset = 0; $offset < 14; ++$offset ) {
-			$date            = $current_date->add( new DateInterval( 'P' . $offset . 'D' ) );
-			$delivery_date   = $date->format( 'Y-m-d' );
-			$available_slots = array();
+		try {
+			$today = new DateTimeImmutable( 'today', wp_timezone() );
 
-			foreach ( $slots as $slot ) {
-				if (
-					isset( $slot->rule_key, $slot->label ) &&
-					DeliverySlotService::is_slot_available(
-						$delivery_date,
-						(string) $slot->rule_key
-					)
-				) {
-					$available_slots[] = array(
-						'key'   => (string) $slot->rule_key,
-						'label' => (string) $slot->label,
-					);
+			for ( $day_offset = 0; $day_offset < 14; ++$day_offset ) {
+				$date = $today->add( new DateInterval( 'P' . $day_offset . 'D' ) );
+
+				if ( DeliverySlotService::is_date_available( $date->format( 'Y-m-d' ) ) ) {
+					$options['dates'][] = $date->format( 'Y-m-d' );
 				}
 			}
 
-			if ( ! empty( $available_slots ) ) {
-				$options[] = array(
-					'date'  => $delivery_date,
-					'label' => wp_date( get_option( 'date_format' ), $date->getTimestamp() ),
-					'slots' => $available_slots,
-				);
-			}
+			$options['slots'] = DeliverySlotService::get_active();
+		} catch ( \Exception $exception ) {
+			$options = array(
+				'dates' => array(),
+				'slots' => array(),
+			);
 		}
 
 		return $options;
