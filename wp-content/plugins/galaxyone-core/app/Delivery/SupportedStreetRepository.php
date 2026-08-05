@@ -87,6 +87,52 @@ final class SupportedStreetRepository {
 	}
 
 	/**
+	 * Determines whether an exact normalized street is active in its service area.
+	 *
+	 * @param string $street_name  Street display name.
+	 * @param string $locality     Locality display name.
+	 * @param string $service_area Service-area postcode.
+	 * @return bool
+	 */
+	public static function is_active_supported_street(
+		string $street_name,
+		string $locality,
+		string $service_area
+	): bool {
+		global $wpdb;
+
+		$prepared_street = StreetNormalizationService::prepare(
+			$street_name,
+			$locality,
+			$service_area
+		);
+
+		if (
+			! is_array( $prepared_street ) ||
+			! self::is_valid_prepared_street( $prepared_street )
+		) {
+			return false;
+		}
+
+		$table_name = CreateSupportedStreetsTable::get_table_name();
+		$street_id = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT id
+				FROM {$table_name}
+				WHERE street_identity_key = %s
+					AND service_area = %s
+					AND is_active = %d
+				LIMIT 1", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$prepared_street['street_identity_key'],
+				$prepared_street['service_area'],
+				1
+			)
+		);
+
+		return absint( $street_id ) > 0;
+	}
+
+	/**
 	 * Returns active supported streets.
 	 *
 	 * @return array<int, array<string, int|string>>
