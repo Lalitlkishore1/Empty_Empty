@@ -147,13 +147,18 @@ final class CheckoutModule implements ModuleInterface {
 			$city
 		);
 
-		$result = CheckoutValidationService::validate( $postcode, $date, $slot_key );
+		$validation_errors = CheckoutValidationService::validate( $data );
 
-		if ( ! $result['valid'] ) {
-			$errors->add(
-				'galaxyone_checkout_validation',
-				(string) $result['message']
-			);
+		foreach ( $validation_errors as $validation_error ) {
+			if ( ! $validation_error instanceof WP_Error ) {
+				continue;
+			}
+
+			foreach ( $validation_error->get_error_codes() as $error_code ) {
+				foreach ( $validation_error->get_error_messages( $error_code ) as $error_message ) {
+					$errors->add( $error_code, $error_message );
+				}
+			}
 		}
 	}
 
