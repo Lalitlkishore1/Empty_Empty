@@ -299,7 +299,7 @@ final class CheckoutModule implements ModuleInterface {
 				}
 			}
 
-			$options['slots'] = DeliverySlotService::get_active();
+			$options['slots'] = DeliverySlotService::get_slots();
 		} catch ( \Exception $exception ) {
 			$options = array(
 				'dates' => array(),
