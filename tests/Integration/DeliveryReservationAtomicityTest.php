@@ -78,6 +78,8 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 	}
 
 	public function test_validation_service_creates_reservation_using_server_operation_key(): void {
+		global $wpdb;
+
 		$this->create_capacity( 1 );
 
 		self::assertTrue(
@@ -87,23 +89,47 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 				'0'
 			)
 		);
-
-		$result = DeliveryValidationService::reserve(
-			array(
-				'postcode' => $this->postcode,
-			),
-			$this->delivery_date,
-			$this->slot_key,
-			1,
-			0,
-			wp_generate_uuid4()
+		self::assertTrue(
+			\GalaxyOne\Core\Database\Migrations\CreateSupportedStreetsTable::up()
 		);
 
-		self::assertNotInstanceOf( WP_Error::class, $result );
-		self::assertIsArray( $result );
-		self::assertArrayHasKey( 'reservation', $result );
-		self::assertSame( 1, $this->get_capacity()['reserved_count'] );
-		self::assertSame( 1, $this->get_reservation_count( 'active' ) );
+		$street_name = 'Atomicity Street ' . $this->slot_key;
+		$locality    = 'Atomicity Locality';
+		$street_id   = \GalaxyOne\Core\Delivery\SupportedStreetRepository::create(
+			$street_name,
+			$locality,
+			$this->postcode
+		);
+
+		self::assertIsInt( $street_id );
+		self::assertGreaterThan( 0, $street_id );
+
+		try {
+			$result = DeliveryValidationService::reserve(
+				array(
+					'address_1' => $street_name,
+					'city'      => $locality,
+					'postcode'  => $this->postcode,
+				),
+				$this->delivery_date,
+				$this->slot_key,
+				1,
+				0,
+				wp_generate_uuid4()
+			);
+
+			self::assertNotInstanceOf( WP_Error::class, $result );
+			self::assertIsArray( $result );
+			self::assertArrayHasKey( 'reservation', $result );
+			self::assertSame( 1, $this->get_capacity()['reserved_count'] );
+			self::assertSame( 1, $this->get_reservation_count( 'active' ) );
+		} finally {
+			$wpdb->delete(
+				\GalaxyOne\Core\Database\Migrations\CreateSupportedStreetsTable::get_table_name(),
+				array( 'id' => $street_id ),
+				array( '%d' )
+			);
+		}
 	}
 
 	public function test_reservation_insert_failure_rolls_back_capacity_claim(): void {
