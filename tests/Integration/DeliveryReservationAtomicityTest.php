@@ -101,10 +101,10 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 			$this->postcode
 		);
 
-		self::assertIsInt( $street_id );
-		self::assertGreaterThan( 0, $street_id );
-
 		try {
+			self::assertIsInt( $street_id );
+			self::assertGreaterThan( 0, $street_id );
+
 			$result = DeliveryValidationService::reserve(
 				array(
 					'address_1' => $street_name,
@@ -124,11 +124,13 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 			self::assertSame( 1, $this->get_capacity()['reserved_count'] );
 			self::assertSame( 1, $this->get_reservation_count( 'active' ) );
 		} finally {
-			$wpdb->delete(
-				\GalaxyOne\Core\Database\Migrations\CreateSupportedStreetsTable::get_table_name(),
-				array( 'id' => $street_id ),
-				array( '%d' )
-			);
+			if ( is_int( $street_id ) && $street_id > 0 ) {
+				$wpdb->delete(
+					\GalaxyOne\Core\Database\Migrations\CreateSupportedStreetsTable::get_table_name(),
+					array( 'id' => $street_id ),
+					array( '%d' )
+				);
+			}
 		}
 	}
 
@@ -980,7 +982,7 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 
 		$worker['closed'] = true;
 	}
-
+	
 	private function cleanup_fixtures(): void {
 		global $wpdb;
 
