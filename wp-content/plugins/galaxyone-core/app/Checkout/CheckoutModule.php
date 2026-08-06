@@ -12,11 +12,9 @@ namespace GalaxyOne\Core\Checkout;
 use DateInterval;
 use DateTimeImmutable;
 use GalaxyOne\Core\Cart\CartRecalculationService;
-use GalaxyOne\Core\Cart\CartValidationService;
 use GalaxyOne\Core\Contracts\ModuleInterface;
 use GalaxyOne\Core\Delivery\DeliverySlotService;
 use GalaxyOne\Core\Orders\OrderMetaService;
-use GalaxyOne\Core\Orders\OrderStatus;
 use WC_Order;
 use WC_Order_Item_Product;
 use WP_Error;
@@ -38,7 +36,6 @@ final class CheckoutModule implements ModuleInterface {
 		add_action( 'woocommerce_checkout_create_order_line_item', array( $this, 'store_order_item_snapshot' ), 10, 4 );
 		add_action( 'woocommerce_checkout_create_order', array( $this, 'store_order_metadata' ), 10, 2 );
 		add_action( 'woocommerce_checkout_order_processed', array( $this, 'confirm_delivery_reservation' ), 10, 3 );
-		add_filter( 'woocommerce_payment_gateways', array( $this, 'register_payment_gateways' ) );
 	}
 
 	/**
@@ -177,36 +174,7 @@ final class CheckoutModule implements ModuleInterface {
 		array $values,
 		WC_Order $order
 	): void {
-		if ( ! isset( $values['data'] ) || ! is_object( $values['data'] ) ) {
-			return;
-		}
-
-		$product = $values['data'];
-
-		if ( ! method_exists( $product, 'get_id' ) ) {
-			return;
-		}
-
-		$product_id = (int) $product->get_id();
-
-		if ( $product_id <= 0 ) {
-			return;
-		}
-
-		$context = CartRecalculationService::get_product_price_context( $cart_item_key );
-
-		if ( null === $context ) {
-			return;
-		}
-
-		$item->update_meta_data( '_galaxyone_product_id', $product_id );
-		$item->update_meta_data( '_galaxyone_price_snapshot', $context['price'] );
-		$item->update_meta_data( '_galaxyone_price_source', $context['source'] );
-		$item->update_meta_data( '_galaxyone_campaign_id', $context['campaign_id'] );
-
-		if ( '' !== $context['reward_event_token'] ) {
-			$item->update_meta_data( '_galaxyone_reward_event_token', $context['reward_event_token'] );
-		}
+		OrderMetaService::store_line_item_snapshot( $item, $values );
 	}
 
 	/**
@@ -217,33 +185,7 @@ final class CheckoutModule implements ModuleInterface {
 	 * @return void
 	 */
 	public function store_order_metadata( WC_Order $order, array $data ): void {
-		$selection = CartRecalculationService::get_delivery_selection();
-
-		if ( ! empty( $selection['reservation_token'] ) ) {
-			$order->update_meta_data(
-				OrderMetaService::DELIVERY_RESERVATION_TOKEN,
-				(string) $selection['reservation_token']
-			);
-		}
-
-		if ( ! empty( $selection['delivery_date'] ) ) {
-			$order->update_meta_data(
-				OrderMetaService::DELIVERY_DATE,
-				(string) $selection['delivery_date']
-			);
-		}
-
-		if ( ! empty( $selection['slot_key'] ) ) {
-			$order->update_meta_data(
-				OrderMetaService::DELIVERY_SLOT_KEY,
-				(string) $selection['slot_key']
-			);
-		}
-
-		$order->update_meta_data(
-			OrderMetaService::DELIVERY_FEE,
-			CartRecalculationService::get_delivery_fee()
-		);
+		OrderMetaService::store_checkout_metadata( $order, $data );
 	}
 
 	/**
@@ -255,26 +197,7 @@ final class CheckoutModule implements ModuleInterface {
 	 * @return void
 	 */
 	public function confirm_delivery_reservation( int $order_id, array $data, WC_Order $order ): void {
-		$reservation_token = (string) $order->get_meta( OrderMetaService::DELIVERY_RESERVATION_TOKEN );
-
-		if ( '' === $reservation_token ) {
-			return;
-		}
-
-		DeliveryReservationService::confirm( $reservation_token, $order_id );
-		CartRecalculationService::clear_delivery_selection();
-	}
-
-	/**
-	 * Register GalaxyOne payment gateways.
-	 *
-	 * @param array<int, string> $gateways Gateway class names.
-	 * @return array<int, string>
-	 */
-	public function register_payment_gateways( array $gateways ): array {
-		$gateways[] = GalaxyOneCodGateway::class;
-
-		return $gateways;
+		OrderMetaService::confirm_delivery_reservation( $order );
 	}
 
 	/**
@@ -294,8 +217,13 @@ final class CheckoutModule implements ModuleInterface {
 			for ( $day_offset = 0; $day_offset < 14; ++$day_offset ) {
 				$date = $today->add( new DateInterval( 'P' . $day_offset . 'D' ) );
 
-				if ( DeliverySlotService::is_date_available( $date->format( 'Y-m-d' ) ) ) {
-					$options['dates'][] = $date->format( 'Y-m-d' );
+				$delivery_date = $date->format( 'Y-m-d' );
+
+				if (
+					DeliverySlotService::is_valid_date( $delivery_date ) &&
+					! DeliverySlotService::is_closed_date( $delivery_date )
+				) {
+					$options['dates'][] = $delivery_date;
 				}
 			}
 
