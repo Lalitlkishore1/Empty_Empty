@@ -14,6 +14,7 @@ const GALAXYONE_WORKER_BOOTSTRAP_FAILURE = 10;
 const GALAXYONE_WORKER_VALIDATION_FAILURE = 11;
 const GALAXYONE_WORKER_SERVICE_FAILURE = 12;
 const GALAXYONE_WORKER_UNEXPECTED_FAILURE = 13;
+ob_start();
 
 /**
  * Writes a structured worker result and terminates the process.
@@ -31,9 +32,13 @@ function galaxyone_worker_exit( int $exit_code, array $result ): never {
 		$encoded_result = '{"success":false,"error":"serialization_failure"}';
 	}
 
-	echo $encoded_result . PHP_EOL;
-	exit( $exit_code );
-}
+	while ( ob_get_level() > 0 ) {
+	    ob_end_clean();
+    }
+
+    echo $encoded_result . PHP_EOL;
+    exit( $exit_code );
+    }
 
 /**
  * Validates a process-coordination directory.
