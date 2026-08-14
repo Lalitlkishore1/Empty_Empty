@@ -135,7 +135,7 @@ final class DeliveryValidationServiceTest extends IntegrationTestCase {
 		self::assertNotInstanceOf( WP_Error::class, $validation );
 		self::assertIsArray( $validation );
 		self::assertSame( $this->postcode, $validation['service_area']['postcode'] );
-		self::assertSame( '25', $validation['delivery_fee'] );
+		self::assertSame( '25.0000', $validation['delivery_fee'] );
 		self::assertSame( $this->slot_key, $validation['slot']['rule_key'] );
 	}
 
