@@ -594,7 +594,7 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 			"CREATE TRIGGER {$trigger_name} {$definition}" // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		);
 
-		self::assertSame( 0, $created );
+		self::assertTrue( $created );
 	}
 
 	private function get_capacity(): array {
