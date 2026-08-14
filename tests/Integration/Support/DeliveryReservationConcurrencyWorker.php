@@ -146,10 +146,10 @@ try {
 			)
 		);
 	}
-
+    putenv( 'WP_TESTS_SKIP_INSTALL=1' );
 	require_once $bootstrap_file;
 
-	if (
+	if (S
 		! defined( 'GALAXYONE_INTEGRATION_BOOTSTRAPPED' ) ||
 		! class_exists( DeliveryReservationService::class )
 	) {
