@@ -32,6 +32,11 @@ final class DeliveryReservationAtomicityTest extends IntegrationTestCase {
 	public function setUp(): void {
 		parent::setUp();
 
+		global $wpdb;
+
+        $wpdb->query( 'COMMIT' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+        $wpdb->query( 'SET autocommit = 1' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+
 		$this->schema_option_existed   = false !== get_option( 'galaxyone_core_schema_version', false );
 		$this->previous_schema_version = get_option( 'galaxyone_core_schema_version', false );
 		$this->delivery_date           = gmdate( 'Y-m-d', time() + DAY_IN_SECONDS );
