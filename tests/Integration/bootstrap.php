@@ -69,8 +69,7 @@ tests_add_filter(
 );
 
 /*
- * Install WooCommerce and GalaxyOne database schemas before WordPress reaches
- * init. This mirrors WooCommerce's own PHPUnit bootstrap ordering.
+ * WooCommerce must install during WordPress test setup.
  */
 tests_add_filter(
 	'setup_theme',
@@ -82,12 +81,16 @@ tests_add_filter(
 		}
 
 		WC_Install::install();
-
-		\GalaxyOne\Core\Database\SchemaManager::maybe_upgrade();
 	}
 );
 
 require_once $wp_tests_dir . '/includes/bootstrap.php';
+
+/*
+ * WordPress has now completed its test installation and released its setup
+ * table locks. GalaxyOne migrations may safely inspect and join custom tables.
+ */
+\GalaxyOne\Core\Database\SchemaManager::maybe_upgrade();
 
 if ( ! defined( 'GALAXYONE_INTEGRATION_BOOTSTRAPPED' ) ) {
 	define( 'GALAXYONE_INTEGRATION_BOOTSTRAPPED', true );
