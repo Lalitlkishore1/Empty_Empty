@@ -75,7 +75,7 @@ $product_status_id  = 'galaxyone-product-status-' . (int) $card['product_id'];
 				<a
 					class="galaxyone-button galaxyone-button--secondary"
 					href="<?php echo esc_url( (string) $card['product_url'] ); ?>"
-					<?php if ( ! empty( $card['is_available'] ) : ?>
+					<?php if ( ! empty( $card['is_available'] ) ) : ?>
 						aria-label="<?php echo esc_attr( (string) $card['action_label'] . ': ' . $card['name'] ); ?>"
 					<?php else : ?>
 						aria-describedby="<?php echo esc_attr( $product_status_id ); ?>"
