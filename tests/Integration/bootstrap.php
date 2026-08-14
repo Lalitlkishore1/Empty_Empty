@@ -74,6 +74,9 @@ tests_add_filter(
 tests_add_filter(
 	'setup_theme',
 	static function (): void {
+		if ( '1' === getenv( 'WP_TESTS_SKIP_INSTALL' ) ) {
+		    return;
+	    }
 		if ( ! class_exists( 'WC_Install' ) ) {
 			throw new RuntimeException(
 				'WooCommerce installer is unavailable.'
