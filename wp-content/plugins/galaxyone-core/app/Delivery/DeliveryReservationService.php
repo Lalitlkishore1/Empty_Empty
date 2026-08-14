@@ -717,18 +717,22 @@ final class DeliveryReservationService {
 	 * @return bool
 	 */
 	private static function transaction_is_open(): bool {
-		global $wpdb;
+	    global $wpdb;
 
-		self::clear_database_error();
+	    self::clear_database_error();
 
-		$in_transaction = $wpdb->get_var( 'SELECT @@session.in_transaction' ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+	    $in_transaction = $wpdb->get_var(
+		    "SELECT COUNT(*)
+		    FROM information_schema.innodb_trx
+		    WHERE trx_mysql_thread_id = CONNECTION_ID()"
+	    ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 
-		if ( self::database_has_error() || null === $in_transaction ) {
-			return true;
-		}
+	    if ( self::database_has_error() || null === $in_transaction ) {
+		    return true;
+	    }
 
-		return '0' !== (string) $in_transaction;
-	}
+	    return 0 < (int) $in_transaction;
+    }
 
 	/**
 	 * Returns the safe outcome after a failed coordinated write.
