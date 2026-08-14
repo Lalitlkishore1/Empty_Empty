@@ -156,7 +156,7 @@ final class UpgradeDeliveryReservationAtomicity implements MigrationInterface {
 
 		if (
 			false === $wpdb->query(
-				"LOCK TABLES {$capacity_table} WRITE, {$reservations_table} READ" // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				"LOCK TABLES {$capacity_table} AS c WRITE, {$reservations_table} AS r READ" // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			)
 		) {
 			return false;
@@ -222,11 +222,11 @@ final class UpgradeDeliveryReservationAtomicity implements MigrationInterface {
 
 				$updated = $wpdb->query(
 					$wpdb->prepare(
-						"UPDATE {$capacity_table}
+						"UPDATE {$capacity_table} AS c
 						SET reserved_count = %d,
 							updated_at = %s
-						WHERE id = %d
-							AND capacity >= %d", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+						WHERE c.id = %d
+							AND c.capacity >= %d", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 						$derived,
 						$now,
 						(int) $row['id'],
