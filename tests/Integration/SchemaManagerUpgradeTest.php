@@ -26,6 +26,14 @@ final class SchemaManagerUpgradeTest extends IntegrationTestCase {
 
 	public function setUp(): void {
 		parent::setUp();
+		
+		global $wpdb;
+
+        $wpdb->query( 'COMMIT' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+        $wpdb->query( 'SET autocommit = 1' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+
+        remove_filter( 'query', array( $this, '_create_temporary_tables' ) );
+        remove_filter( 'query', array( $this, '_drop_temporary_tables' ) );
 
 		$this->delivery_date                  = gmdate( 'Y-m-d', time() + DAY_IN_SECONDS );
 		$this->slot_key                       = 'schema-atomicity-' . wp_generate_password( 10, false, false );
