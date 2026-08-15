@@ -16,5 +16,8 @@
   <exclude-pattern>wp-config.php</exclude-pattern>
   <exclude-pattern>wp-config-local.php</exclude-pattern>
 
-  <rule ref="WordPress-Extra"/>
+  <rule ref="WordPress-Extra">
+    <exclude name="WordPress.Files.FileName.NotHyphenatedLowercase"/>
+    <exclude name="WordPress.Files.FileName.InvalidClassFileName"/>
+  </rule>
 </ruleset>
