@@ -28,7 +28,8 @@ final class UpgradeDeliveryReservationAtomicity implements MigrationInterface {
 			! self::ensure_innodb( $capacity_table ) ||
 			! self::ensure_innodb( $reservations_table ) ||
 			! self::ensure_idempotency_column( $reservations_table ) ||
-			! self::reconcile_capacity( $capacity_table, $reservations_table ) ||
+            ! self::idempotency_keys_are_unique( $reservations_table ) ||
+            ! self::reconcile_capacity( $capacity_table, $reservations_table ) ||
 			! self::ensure_unique_idempotency_index( $reservations_table )
 		) {
 			return false;
@@ -148,6 +149,26 @@ final class UpgradeDeliveryReservationAtomicity implements MigrationInterface {
 	 * @param string $reservations_table Reservation table name.
 	 * @return bool
 	 */
+	/**
+ 	* Determines whether all non-null idempotency keys are unique.
+ 	*
+ 	* @param string $table_name Reservation table name.
+ 	* @return bool
+ 	*/
+	private static function idempotency_keys_are_unique( string $table_name ): bool {
+		global $wpdb;
+
+		$duplicate_key = $wpdb->get_var(
+			"SELECT idempotency_key
+			FROM {$table_name}
+			WHERE idempotency_key IS NOT NULL
+			GROUP BY idempotency_key
+			HAVING COUNT(*) > 1
+			LIMIT 1" // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		);
+	
+		return null === $duplicate_key;
+	}
 	private static function reconcile_capacity(
 		string $capacity_table,
 		string $reservations_table
