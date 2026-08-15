@@ -359,8 +359,7 @@ final class SchemaManagerUpgradeTest extends IntegrationTestCase {
 
 		$table_name = CreateDeliveryReservationsTable::get_table_name();
 
-		self::assertSame(
-			0,
+		self::assertNotFalse(
 			$wpdb->query(
 				"ALTER TABLE {$table_name} DROP COLUMN idempotency_key" // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			)
