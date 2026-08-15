@@ -65,9 +65,10 @@ final class ActivityLogRepository {
 		$table_name = CreateActivityLogTable::get_table_name();
 		$query      = $wpdb->prepare(
 			"SELECT id, user_id, action, old_value, new_value, context, created_at
-			FROM {$table_name}
+			FROM %i
 			ORDER BY id DESC
-			LIMIT %d", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			LIMIT %d",
+			$table_name,
 			$limit
 		);
 

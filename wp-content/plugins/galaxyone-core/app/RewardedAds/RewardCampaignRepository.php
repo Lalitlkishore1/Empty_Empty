@@ -52,7 +52,7 @@ final class RewardCampaignRepository {
 		$table_name = CreateRewardCampaignsTable::get_table_name();
 		$now        = current_time( 'mysql', true );
 		$query      = $wpdb->prepare(
-			"INSERT INTO {$table_name}
+			"INSERT INTO %i
 				(campaign_key, name, product_id, offer_price, provider_key, required_completions, reward_ttl_minutes, status, starts_at, ends_at, created_at, updated_at)
 			VALUES (%s, %s, %d, %s, %s, %d, %d, %s, NULLIF(%s, ''), NULLIF(%s, ''), %s, %s)
 			ON DUPLICATE KEY UPDATE
@@ -65,7 +65,8 @@ final class RewardCampaignRepository {
 				status = %s,
 				starts_at = NULLIF(%s, ''),
 				ends_at = NULLIF(%s, ''),
-				updated_at = %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				updated_at = %s",
+			$table_name,
 			$campaign['campaign_key'],
 			$campaign['name'],
 			$campaign['product_id'],
@@ -107,9 +108,12 @@ final class RewardCampaignRepository {
 
 		$table_name = CreateRewardCampaignsTable::get_table_name();
 		$campaigns  = $wpdb->get_results(
-			"SELECT campaign_key, name, product_id, offer_price, provider_key, required_completions, reward_ttl_minutes, status, starts_at, ends_at
-			FROM {$table_name}
-			ORDER BY updated_at DESC, id DESC", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$wpdb->prepare(
+				"SELECT campaign_key, name, product_id, offer_price, provider_key, required_completions, reward_ttl_minutes, status, starts_at, ends_at
+				FROM %i
+				ORDER BY updated_at DESC, id DESC",
+				$table_name
+			),
 			ARRAY_A
 		);
 
@@ -147,13 +151,14 @@ final class RewardCampaignRepository {
 		$campaign   = $wpdb->get_row(
 			$wpdb->prepare(
 				"SELECT campaign_key, name, product_id, offer_price, provider_key, required_completions, reward_ttl_minutes, status, starts_at, ends_at
-				FROM {$table_name}
+				FROM %i
 				WHERE product_id = %d
 					AND status = %s
 					AND (starts_at IS NULL OR starts_at <= %s)
 					AND (ends_at IS NULL OR ends_at > %s)
 				ORDER BY offer_price ASC, id ASC
-				LIMIT 1", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				LIMIT 1",
+				$table_name,
 				$product_id,
 				self::STATUS_ACTIVE,
 				$now,
@@ -188,9 +193,10 @@ final class RewardCampaignRepository {
 		$campaign   = $wpdb->get_row(
 			$wpdb->prepare(
 				"SELECT campaign_key, name, product_id, offer_price, provider_key, required_completions, reward_ttl_minutes, status, starts_at, ends_at
-				FROM {$table_name}
+				FROM %i
 				WHERE campaign_key = %s
-				LIMIT 1", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				LIMIT 1",
+				$table_name,
 				$campaign_key
 			),
 			ARRAY_A

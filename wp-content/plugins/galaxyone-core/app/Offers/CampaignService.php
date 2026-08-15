@@ -62,7 +62,7 @@ final class CampaignService {
 		$table_name = CreateOfferCampaignsTable::get_table_name();
 		$now        = current_time( 'mysql', true );
 		$query      = $wpdb->prepare(
-			"INSERT INTO {$table_name}
+			"INSERT INTO %i
 				(campaign_key, name, campaign_type, product_id, offer_price, status, starts_at, ends_at, created_at, updated_at)
 			VALUES (%s, %s, %s, %d, NULLIF(%s, ''), %s, NULLIF(%s, ''), NULLIF(%s, ''), %s, %s)
 			ON DUPLICATE KEY UPDATE
@@ -73,7 +73,8 @@ final class CampaignService {
 				status = %s,
 				starts_at = NULLIF(%s, ''),
 				ends_at = NULLIF(%s, ''),
-				updated_at = %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				updated_at = %s",
+			$table_name,
 			$campaign['campaign_key'],
 			$campaign['name'],
 			$campaign['campaign_type'],
@@ -143,9 +144,10 @@ final class CampaignService {
 		$campaign   = $wpdb->get_row(
 			$wpdb->prepare(
 				"SELECT campaign_key, name, campaign_type, product_id, offer_price, status, starts_at, ends_at
-				FROM {$table_name}
+				FROM %i
 				WHERE campaign_key = %s
-				LIMIT 1", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				LIMIT 1",
+				$table_name,
 				$campaign_key
 			),
 			ARRAY_A
@@ -164,9 +166,12 @@ final class CampaignService {
 
 		$table_name = CreateOfferCampaignsTable::get_table_name();
 		$campaigns  = $wpdb->get_results(
-			"SELECT campaign_key, name, campaign_type, product_id, offer_price, status, starts_at, ends_at
-			FROM {$table_name}
-			ORDER BY updated_at DESC, id DESC", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$wpdb->prepare(
+				"SELECT campaign_key, name, campaign_type, product_id, offer_price, status, starts_at, ends_at
+				FROM %i
+				ORDER BY updated_at DESC, id DESC",
+				$table_name
+			),
 			ARRAY_A
 		);
 
@@ -202,14 +207,15 @@ final class CampaignService {
 		$campaign   = $wpdb->get_row(
 			$wpdb->prepare(
 				"SELECT campaign_key, name, campaign_type, product_id, offer_price, status, starts_at, ends_at
-				FROM {$table_name}
+				FROM %i
 				WHERE campaign_type = %s
 					AND product_id = %d
 					AND status = %s
 					AND (starts_at IS NULL OR starts_at <= %s)
 					AND (ends_at IS NULL OR ends_at > %s)
 				ORDER BY offer_price ASC, id ASC
-				LIMIT 1", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				LIMIT 1",
+				$table_name,
 				self::TYPE_PRODUCT_PRICE,
 				$product_id,
 				self::STATUS_ACTIVE,
@@ -235,12 +241,13 @@ final class CampaignService {
 		$campaigns  = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT campaign_key, name, campaign_type, product_id, offer_price, status, starts_at, ends_at
-				FROM {$table_name}
+				FROM %i
 				WHERE campaign_type = %s
 					AND status = %s
 					AND (starts_at IS NULL OR starts_at <= %s)
 					AND (ends_at IS NULL OR ends_at > %s)
-				ORDER BY product_id ASC, id ASC", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				ORDER BY product_id ASC, id ASC",
+				$table_name,
 				self::TYPE_FREE_DELIVERY,
 				self::STATUS_ACTIVE,
 				$now,

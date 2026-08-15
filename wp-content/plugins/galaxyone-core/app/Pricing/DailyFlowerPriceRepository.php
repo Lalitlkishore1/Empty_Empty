@@ -29,10 +29,11 @@ final class DailyFlowerPriceRepository {
 		$record     = $wpdb->get_row(
 			$wpdb->prepare(
 				"SELECT product_id, effective_date, price, is_available
-				FROM {$table_name}
+				FROM %i
 				WHERE product_id = %d
 					AND effective_date = %s
-				LIMIT 1", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				LIMIT 1",
+				$table_name,
 				$product_id,
 				$effective_date
 			),
@@ -91,13 +92,14 @@ final class DailyFlowerPriceRepository {
 		$table_name = CreateFlowerDailyPricesTable::get_table_name();
 		$now        = current_time( 'mysql', true );
 		$query      = $wpdb->prepare(
-			"INSERT INTO {$table_name}
+			"INSERT INTO %i
 				(product_id, effective_date, price, is_available, created_at, updated_at)
 			VALUES (%d, %s, %s, %d, %s, %s)
 			ON DUPLICATE KEY UPDATE
 				price = %s,
 				is_available = %d,
-				updated_at = %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				updated_at = %s",
+			$table_name,
 			$product_id,
 			$effective_date,
 			$normalized_price,

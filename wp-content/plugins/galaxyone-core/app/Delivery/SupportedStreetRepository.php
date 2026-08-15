@@ -118,11 +118,12 @@ final class SupportedStreetRepository {
 		$street_id = $wpdb->get_var(
 			$wpdb->prepare(
 				"SELECT id
-				FROM {$table_name}
+				FROM %i
 				WHERE street_identity_key = %s
 					AND service_area = %s
 					AND is_active = %d
-				LIMIT 1", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				LIMIT 1",
+				$table_name,
 				$prepared_street['street_identity_key'],
 				$prepared_street['service_area'],
 				1
@@ -142,10 +143,13 @@ final class SupportedStreetRepository {
 
 		$table_name = CreateSupportedStreetsTable::get_table_name();
 		$records    = $wpdb->get_results(
-			"SELECT id, street_name, locality, service_area
-			FROM {$table_name}
+			$wpdb->prepare(
+				"SELECT id, street_name, locality, service_area
+			FROM %i
 			WHERE is_active = 1
-			ORDER BY normalized_locality ASC, normalized_street_name ASC, id ASC", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			ORDER BY normalized_locality ASC, normalized_street_name ASC, id ASC",
+				$table_name
+			),
 			ARRAY_A
 		);
 
@@ -249,9 +253,10 @@ final class SupportedStreetRepository {
 		$street_id = $wpdb->get_var(
 			$wpdb->prepare(
 				"SELECT id
-				FROM {$table_name}
+				FROM %i
 				WHERE street_identity_key = %s
-				LIMIT 1", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				LIMIT 1",
+				$table_name,
 				$identity_key
 			)
 		);

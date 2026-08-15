@@ -37,11 +37,12 @@ final class ServiceAreaService {
 		$record     = $wpdb->get_row(
 			$wpdb->prepare(
 				"SELECT service_area, label, fee
-				FROM {$table_name}
+				FROM %i
 				WHERE rule_type = %s
 					AND service_area = %s
 					AND is_active = 1
-				LIMIT 1", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				LIMIT 1",
+				$table_name,
 				self::RULE_TYPE,
 				$postcode
 			),
@@ -81,7 +82,7 @@ final class ServiceAreaService {
 		$table_name = CreateDeliveryRulesTable::get_table_name();
 		$now        = current_time( 'mysql', true );
 		$query      = $wpdb->prepare(
-			"INSERT INTO {$table_name}
+			"INSERT INTO %i
 				(rule_type, rule_key, label, service_area, fee, is_active, created_at, updated_at)
 			VALUES (%s, %s, %s, %s, %s, %d, %s, %s)
 			ON DUPLICATE KEY UPDATE
@@ -89,7 +90,8 @@ final class ServiceAreaService {
 				service_area = %s,
 				fee = %s,
 				is_active = %d,
-				updated_at = %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				updated_at = %s",
+			$table_name,
 			self::RULE_TYPE,
 			$postcode,
 			$label,
@@ -120,10 +122,11 @@ final class ServiceAreaService {
 		$areas      = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT service_area, label, fee
-				FROM {$table_name}
+				FROM %i
 				WHERE rule_type = %s
 					AND is_active = 1
-				ORDER BY service_area ASC", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				ORDER BY service_area ASC",
+				$table_name,
 				self::RULE_TYPE
 			)
 		);

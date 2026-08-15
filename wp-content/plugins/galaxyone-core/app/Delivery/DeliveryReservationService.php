@@ -198,9 +198,10 @@ final class DeliveryReservationService {
 		$tokens = $wpdb->get_col(
 			$wpdb->prepare(
 				"SELECT reservation_token
-				FROM {$table_name}
+				FROM %i
 				WHERE status = %s
-					AND expires_at < %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+					AND expires_at < %s",
+				$table_name,
 				self::ACTIVE_STATUS,
 				current_time( 'mysql', true )
 			)
@@ -382,13 +383,14 @@ final class DeliveryReservationService {
 
 		$updated = $wpdb->query(
 			$wpdb->prepare(
-				"UPDATE {$table_name}
+				"UPDATE %i
 				SET order_id = %d,
 					status = %s,
 					expires_at = %s
 				WHERE id = %d
 					AND status = %s
-					AND expires_at > %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+					AND expires_at > %s",
+				$table_name,
 				$order_id,
 				self::CONFIRMED_STATUS,
 				current_time( 'mysql', true ),
@@ -459,11 +461,12 @@ final class DeliveryReservationService {
 
 		$updated = $wpdb->query(
 			$wpdb->prepare(
-				"UPDATE {$table_name}
+				"UPDATE %i
 				SET status = %s,
 					released_at = %s
 				WHERE id = %d
-					AND status IN (%s, %s)", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+					AND status IN (%s, %s)",
+				$table_name,
 				$status,
 				current_time( 'mysql', true ),
 				(int) $reservation['id'],
@@ -555,12 +558,13 @@ final class DeliveryReservationService {
 
 		$updated = $wpdb->query(
 			$wpdb->prepare(
-				"UPDATE {$table_name}
+				"UPDATE %i
 				SET status = %s,
 					released_at = %s
 				WHERE id = %d
 					AND status = %s
-					AND expires_at < %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+					AND expires_at < %s",
+				$table_name,
 				'expired',
 				current_time( 'mysql', true ),
 				(int) $reservation['id'],
@@ -601,10 +605,11 @@ final class DeliveryReservationService {
 			$wpdb->prepare(
 				"SELECT id, reservation_token, idempotency_key, order_id, delivery_date,
 					slot_key, quantity, status, expires_at
-				FROM {$table_name}
+				FROM %i
 				WHERE idempotency_key = %s
 				LIMIT 1
-				FOR UPDATE", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				FOR UPDATE",
+				$table_name,
 				$idempotency_key
 			),
 			ARRAY_A
@@ -636,10 +641,11 @@ final class DeliveryReservationService {
 			$wpdb->prepare(
 				"SELECT id, reservation_token, order_id, delivery_date, slot_key,
 					quantity, status, expires_at
-				FROM {$table_name}
+				FROM %i
 				WHERE reservation_token = %s
 				LIMIT 1
-				FOR UPDATE", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				FOR UPDATE",
+				$table_name,
 				$reservation_token
 			),
 			ARRAY_A

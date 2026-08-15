@@ -76,7 +76,7 @@ final class DeliverySlotService {
 		$table_name = CreateDeliveryRulesTable::get_table_name();
 		$now        = current_time( 'mysql', true );
 		$query      = $wpdb->prepare(
-			"INSERT INTO {$table_name}
+			"INSERT INTO %i
 				(rule_type, rule_key, label, weekday, start_time, end_time, cutoff_time, is_active, created_at, updated_at)
 			VALUES (%s, %s, %s, %d, %s, %s, NULLIF(%s, ''), %d, %s, %s)
 			ON DUPLICATE KEY UPDATE
@@ -86,7 +86,8 @@ final class DeliverySlotService {
 				end_time = %s,
 				cutoff_time = NULLIF(%s, ''),
 				is_active = %d,
-				updated_at = %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				updated_at = %s",
+			$table_name,
 			self::SLOT_RULE_TYPE,
 			$slot_key,
 			$label,
@@ -125,12 +126,13 @@ final class DeliverySlotService {
 		$table_name = CreateDeliveryRulesTable::get_table_name();
 		$now        = current_time( 'mysql', true );
 		$query      = $wpdb->prepare(
-			"INSERT INTO {$table_name}
+			"INSERT INTO %i
 				(rule_type, rule_key, label, closed_date, is_active, created_at, updated_at)
 			VALUES (%s, %s, %s, %s, %d, %s, %s)
 			ON DUPLICATE KEY UPDATE
 				is_active = %d,
-				updated_at = %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				updated_at = %s",
+			$table_name,
 			self::CLOSED_DATE_RULE_TYPE,
 			$delivery_date,
 			$delivery_date,
@@ -157,10 +159,11 @@ final class DeliverySlotService {
 		$slots      = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT rule_key, label, weekday, start_time, end_time, cutoff_time
-				FROM {$table_name}
+				FROM %i
 				WHERE rule_type = %s
 					AND is_active = 1
-				ORDER BY start_time ASC", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				ORDER BY start_time ASC",
+				$table_name,
 				self::SLOT_RULE_TYPE
 			)
 		);
@@ -187,11 +190,12 @@ final class DeliverySlotService {
 		$slot       = $wpdb->get_row(
 			$wpdb->prepare(
 				"SELECT rule_key, label, weekday, start_time, end_time, cutoff_time
-				FROM {$table_name}
+				FROM %i
 				WHERE rule_type = %s
 					AND rule_key = %s
 					AND is_active = 1
-				LIMIT 1", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				LIMIT 1",
+				$table_name,
 				self::SLOT_RULE_TYPE,
 				$slot_key
 			),
@@ -267,11 +271,12 @@ final class DeliverySlotService {
 		$rule_id    = $wpdb->get_var(
 			$wpdb->prepare(
 				"SELECT id
-				FROM {$table_name}
+				FROM %i
 				WHERE rule_type = %s
 					AND closed_date = %s
 					AND is_active = 1
-				LIMIT 1", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				LIMIT 1",
+				$table_name,
 				self::CLOSED_DATE_RULE_TYPE,
 				$delivery_date
 			)

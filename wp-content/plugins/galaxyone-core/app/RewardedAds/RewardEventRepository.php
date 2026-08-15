@@ -92,10 +92,11 @@ final class RewardEventRepository {
 		$event      = $wpdb->get_row(
 			$wpdb->prepare(
 				"SELECT event_token, campaign_key, product_id, customer_hash, provider_key, status, completion_count, required_completions, offer_price, order_id, expires_at
-				FROM {$table_name}
+				FROM %i
 				WHERE event_token = %s
 					AND customer_hash = %s
-				LIMIT 1", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				LIMIT 1",
+				$table_name,
 				$event_token,
 				$customer_hash
 			),
@@ -123,13 +124,14 @@ final class RewardEventRepository {
 		$event      = $wpdb->get_row(
 			$wpdb->prepare(
 				"SELECT event_token, campaign_key, product_id, customer_hash, provider_key, status, completion_count, required_completions, offer_price, order_id, expires_at
-				FROM {$table_name}
+				FROM %i
 				WHERE product_id = %d
 					AND customer_hash = %s
 					AND status = %s
 					AND expires_at > %s
 				ORDER BY completed_at DESC, id DESC
-				LIMIT 1", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				LIMIT 1",
+				$table_name,
 				$product_id,
 				$customer_hash,
 				'completed',
@@ -158,7 +160,7 @@ final class RewardEventRepository {
 		$table_name = CreateRewardEventsTable::get_table_name();
 		$updated    = $wpdb->query(
 			$wpdb->prepare(
-				"UPDATE {$table_name}
+				"UPDATE %i
 				SET completion_count = required_completions,
 					status = %s,
 					completed_at = %s,
@@ -166,7 +168,8 @@ final class RewardEventRepository {
 				WHERE event_token = %s
 					AND customer_hash = %s
 					AND status = %s
-					AND expires_at > %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+					AND expires_at > %s",
+				$table_name,
 				'completed',
 				current_time( 'mysql', true ),
 				current_time( 'mysql', true ),
@@ -202,7 +205,7 @@ final class RewardEventRepository {
 		$table_name = CreateRewardEventsTable::get_table_name();
 		$updated    = $wpdb->query(
 			$wpdb->prepare(
-				"UPDATE {$table_name}
+				"UPDATE %i
 				SET status = %s,
 					order_id = %d,
 					redeemed_at = %s,
@@ -210,7 +213,8 @@ final class RewardEventRepository {
 				WHERE event_token = %s
 					AND customer_hash = %s
 					AND status = %s
-					AND expires_at > %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+					AND expires_at > %s",
+				$table_name,
 				'redeemed',
 				$order_id,
 				current_time( 'mysql', true ),
@@ -241,11 +245,12 @@ final class RewardEventRepository {
 
 		return (int) $wpdb->query(
 			$wpdb->prepare(
-				"UPDATE {$table_name}
+				"UPDATE %i
 				SET status = %s,
 					updated_at = %s
 				WHERE status IN (%s, %s)
-					AND expires_at <= %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+					AND expires_at <= %s",
+				$table_name,
 				'expired',
 				current_time( 'mysql', true ),
 				'pending',

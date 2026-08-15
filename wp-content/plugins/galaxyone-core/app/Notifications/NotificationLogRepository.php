@@ -158,9 +158,10 @@ final class NotificationLogRepository {
 		$records    = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT event_key, provider_key, recipient, status, subject, error_message, sent_at, created_at
-				FROM {$table_name}
+				FROM %i
 				WHERE order_id = %d
-				ORDER BY id DESC", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				ORDER BY id DESC",
+				$table_name,
 				$order_id
 			)
 		);

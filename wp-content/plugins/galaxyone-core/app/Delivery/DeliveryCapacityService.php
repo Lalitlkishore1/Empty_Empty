@@ -50,12 +50,13 @@ final class DeliveryCapacityService {
 		$table_name = CreateDeliveryCapacityTable::get_table_name();
 		$now        = current_time( 'mysql', true );
 		$query      = $wpdb->prepare(
-			"INSERT INTO {$table_name}
+			"INSERT INTO %i
 				(delivery_date, slot_key, capacity, reserved_count, updated_at)
 			VALUES (%s, %s, %d, %d, %s)
 			ON DUPLICATE KEY UPDATE
 				capacity = IF(reserved_count <= %d, %d, capacity),
-				updated_at = IF(reserved_count <= %d, %s, updated_at)", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				updated_at = IF(reserved_count <= %d, %s, updated_at)",
+			$table_name,
 			$delivery_date,
 			$slot_key,
 			$capacity,
@@ -92,10 +93,11 @@ final class DeliveryCapacityService {
 		$capacity   = $wpdb->get_row(
 			$wpdb->prepare(
 				"SELECT capacity, reserved_count
-				FROM {$table_name}
+				FROM %i
 				WHERE delivery_date = %s
 					AND slot_key = %s
-				LIMIT 1", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				LIMIT 1",
+				$table_name,
 				$delivery_date,
 				sanitize_title( $slot_key )
 			),
@@ -153,12 +155,13 @@ final class DeliveryCapacityService {
 		$table_name = CreateDeliveryCapacityTable::get_table_name();
 		$result     = $wpdb->query(
 			$wpdb->prepare(
-				"UPDATE {$table_name}
+				"UPDATE %i
 				SET reserved_count = reserved_count + %d,
 					updated_at = %s
 				WHERE delivery_date = %s
 					AND slot_key = %s
-					AND capacity - reserved_count >= %d", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+					AND capacity - reserved_count >= %d",
+				$table_name,
 				$quantity,
 				current_time( 'mysql', true ),
 				$delivery_date,
@@ -195,12 +198,13 @@ final class DeliveryCapacityService {
 		$table_name = CreateDeliveryCapacityTable::get_table_name();
 		$result     = $wpdb->query(
 			$wpdb->prepare(
-				"UPDATE {$table_name}
+				"UPDATE %i
 				SET reserved_count = reserved_count - %d,
 					updated_at = %s
 				WHERE delivery_date = %s
 					AND slot_key = %s
-					AND reserved_count >= %d", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+					AND reserved_count >= %d",
+				$table_name,
 				$quantity,
 				current_time( 'mysql', true ),
 				$delivery_date,

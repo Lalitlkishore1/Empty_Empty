@@ -132,8 +132,11 @@ final class UpgradeDeliveryReservationAtomicity implements MigrationInterface {
 
 		if (
 			false === $wpdb->query(
-				"ALTER TABLE {$table_name}
-				ADD COLUMN idempotency_key CHAR(36) NULL AFTER reservation_token" // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$wpdb->prepare(
+					"ALTER TABLE %i
+					ADD COLUMN idempotency_key CHAR(36) NULL AFTER reservation_token",
+					$table_name
+				)
 			)
 		) {
 			return false;
@@ -159,12 +162,15 @@ final class UpgradeDeliveryReservationAtomicity implements MigrationInterface {
 		global $wpdb;
 
 		$duplicate_key = $wpdb->get_var(
-			"SELECT idempotency_key
-			FROM {$table_name}
+			$wpdb->prepare(
+				"SELECT idempotency_key
+			FROM %i
 			WHERE idempotency_key IS NOT NULL
 			GROUP BY idempotency_key
 			HAVING COUNT(*) > 1
-			LIMIT 1" // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			LIMIT 1",
+				$table_name
+			)
 		);
 	
 		return null === $duplicate_key;
@@ -177,7 +183,11 @@ final class UpgradeDeliveryReservationAtomicity implements MigrationInterface {
 
 		if (
 			false === $wpdb->query(
-				"LOCK TABLES {$capacity_table} AS c WRITE, {$reservations_table} AS r READ" // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$wpdb->prepare(
+					'LOCK TABLES %i AS c WRITE, %i AS r READ',
+					$capacity_table,
+					$reservations_table
+				)
 			)
 		) {
 			return false;
@@ -185,14 +195,18 @@ final class UpgradeDeliveryReservationAtomicity implements MigrationInterface {
 
 		try {
 			$unmatched_reservation = $wpdb->get_var(
-				"SELECT r.id
-				FROM {$reservations_table} r
-				LEFT JOIN {$capacity_table} c
+				$wpdb->prepare(
+					"SELECT r.id
+					FROM %i r
+					LEFT JOIN %i c
 					ON c.delivery_date = r.delivery_date
 					AND c.slot_key = r.slot_key
 				WHERE r.status IN ('active', 'confirmed')
 					AND c.id IS NULL
-				LIMIT 1" // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+					LIMIT 1",
+					$reservations_table,
+					$capacity_table
+				)
 			);
 
 			if ( null !== $unmatched_reservation ) {
@@ -200,7 +214,8 @@ final class UpgradeDeliveryReservationAtomicity implements MigrationInterface {
 			}
 
 			$rows = $wpdb->get_results(
-				"SELECT c.id, c.capacity, c.reserved_count,
+				$wpdb->prepare(
+					"SELECT c.id, c.capacity, c.reserved_count,
 					COALESCE(
 						SUM(
 							CASE
@@ -210,11 +225,14 @@ final class UpgradeDeliveryReservationAtomicity implements MigrationInterface {
 						),
 						0
 					) AS derived_reserved_count
-				FROM {$capacity_table} c
-				LEFT JOIN {$reservations_table} r
+					FROM %i c
+					LEFT JOIN %i r
 					ON r.delivery_date = c.delivery_date
 					AND r.slot_key = c.slot_key
-				GROUP BY c.id, c.capacity, c.reserved_count", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+					GROUP BY c.id, c.capacity, c.reserved_count",
+					$capacity_table,
+					$reservations_table
+				),
 				ARRAY_A
 			);
 
@@ -243,11 +261,12 @@ final class UpgradeDeliveryReservationAtomicity implements MigrationInterface {
 
 				$updated = $wpdb->query(
 					$wpdb->prepare(
-						"UPDATE {$capacity_table} AS c
+						"UPDATE %i AS c
 						SET reserved_count = %d,
 							updated_at = %s
 						WHERE c.id = %d
-							AND c.capacity >= %d", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+							AND c.capacity >= %d",
+						$capacity_table,
 						$derived,
 						$now,
 						(int) $row['id'],
@@ -280,12 +299,15 @@ final class UpgradeDeliveryReservationAtomicity implements MigrationInterface {
 		}
 
 		$duplicate_key = $wpdb->get_var(
-			"SELECT idempotency_key
-			FROM {$table_name}
+			$wpdb->prepare(
+				"SELECT idempotency_key
+			FROM %i
 			WHERE idempotency_key IS NOT NULL
 			GROUP BY idempotency_key
 			HAVING COUNT(*) > 1
-			LIMIT 1" // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			LIMIT 1",
+				$table_name
+			)
 		);
 
 		if ( null !== $duplicate_key ) {
@@ -294,8 +316,11 @@ final class UpgradeDeliveryReservationAtomicity implements MigrationInterface {
 
 		if (
 			false === $wpdb->query(
-				"ALTER TABLE {$table_name}
-				ADD UNIQUE KEY idempotency_key (idempotency_key)" // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$wpdb->prepare(
+					"ALTER TABLE %i
+					ADD UNIQUE KEY idempotency_key (idempotency_key)",
+					$table_name
+				)
 			)
 		) {
 			return false;
@@ -389,15 +414,19 @@ final class UpgradeDeliveryReservationAtomicity implements MigrationInterface {
 		global $wpdb;
 
 		$unmatched_reservation = $wpdb->get_var(
-			"SELECT r.id
-			FROM {$reservations_table} r
-			LEFT JOIN {$capacity_table} c
+			$wpdb->prepare(
+				"SELECT r.id
+				FROM %i r
+				LEFT JOIN %i c
 				ON c.delivery_date = r.delivery_date
 				AND c.slot_key = r.slot_key
 			WHERE r.status IN ('active', 'confirmed')
 			GROUP BY r.id
 			HAVING COUNT(c.id) <> 1
-			LIMIT 1" // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				LIMIT 1",
+				$reservations_table,
+				$capacity_table
+			)
 		);
 
 		if ( null !== $unmatched_reservation ) {
@@ -405,9 +434,10 @@ final class UpgradeDeliveryReservationAtomicity implements MigrationInterface {
 		}
 
 		$invalid_row = $wpdb->get_var(
-			"SELECT c.id
-			FROM {$capacity_table} c
-			LEFT JOIN {$reservations_table} r
+			$wpdb->prepare(
+				"SELECT c.id
+				FROM %i c
+				LEFT JOIN %i r
 				ON r.delivery_date = c.delivery_date
 				AND r.slot_key = c.slot_key
 			GROUP BY c.id, c.capacity, c.reserved_count
@@ -421,7 +451,10 @@ final class UpgradeDeliveryReservationAtomicity implements MigrationInterface {
 				0
 			)
 			OR c.reserved_count > c.capacity
-			LIMIT 1" // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				LIMIT 1",
+				$capacity_table,
+				$reservations_table
+			)
 		);
 
 		return null === $invalid_row;
