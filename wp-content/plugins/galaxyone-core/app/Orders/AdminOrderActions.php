@@ -44,7 +44,7 @@ final class AdminOrderActions {
 			);
 		}
 
-		$order_id = isset( $_POST['order_id'] ) ? absint( $_POST['order_id'] ) : 0;
+		$order_id = isset( $_POST['order_id'] ) ? absint( $_POST['order_id'] ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Needed to construct the order-specific nonce action.
 		$order    = wc_get_order( $order_id );
 
 		if ( ! $order instanceof WC_Order ) {
