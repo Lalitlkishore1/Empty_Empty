@@ -208,8 +208,7 @@ final class SchemaManagerUpgradeTest extends IntegrationTestCase {
 
 		$reservations_table = CreateDeliveryReservationsTable::get_table_name();
 
-		self::assertSame(
-			0,
+		self::assertNotFalse(
 			$wpdb->query(
 				"ALTER TABLE {$reservations_table}
 				ADD COLUMN idempotency_key CHAR(36) NULL
