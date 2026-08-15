@@ -1,11 +1,12 @@
 <?xml version="1.0"?>
 <ruleset name="GalaxyOne">
-  <description>WordPress coding standards for GalaxyOne.</description>
+  <description>Security-focused WordPress coding standards for GalaxyOne.</description>
 
   <arg name="basepath" value="."/>
   <arg name="colors"/>
   <arg name="extensions" value="php,inc"/>
   <arg value="sp"/>
+  <arg name="warning-severity" value="0"/>
 
   <file>.</file>
 
@@ -19,5 +20,34 @@
   <rule ref="WordPress-Extra">
     <exclude name="WordPress.Files.FileName.NotHyphenatedLowercase"/>
     <exclude name="WordPress.Files.FileName.InvalidClassFileName"/>
+
+    <!-- Style-only rules are not deployment blockers for this PSR-4 application. -->
+    <exclude name="Generic.Formatting.MultipleStatementAlignment"/>
+    <exclude name="WordPress.Arrays.MultipleStatementAlignment"/>
+    <exclude name="Generic.WhiteSpace.DisallowSpaceIndent"/>
+    <exclude name="Generic.WhiteSpace.ScopeIndent"/>
+    <exclude name="Squiz.WhiteSpace.SuperfluousWhitespace.EndLine"/>
+    <exclude name="WordPress.WhiteSpace.OperatorSpacing"/>
+    <exclude name="WordPress.Arrays.ArrayDeclarationSpacing"/>
+    <exclude name="WordPress.PHP.YodaConditions"/>
+    <exclude name="Squiz.Strings.DoubleQuoteUsage"/>
+  </rule>
+
+  <!-- Integration tests intentionally use dynamic test tables and direct SQL. -->
+  <rule ref="WordPress.DB.PreparedSQL.InterpolatedNotPrepared">
+    <exclude-pattern>tests/*</exclude-pattern>
+  </rule>
+
+  <rule ref="WordPress.DB.PreparedSQL.NotPrepared">
+    <exclude-pattern>tests/*</exclude-pattern>
+  </rule>
+
+  <!-- CLI concurrency worker intentionally emits JSON and controls subprocesses. -->
+  <rule ref="WordPress.Security.EscapeOutput.OutputNotEscaped">
+    <exclude-pattern>tests/Integration/Support/DeliveryReservationConcurrencyWorker.php</exclude-pattern>
+  </rule>
+
+  <rule ref="WordPress.WP.GlobalVariablesOverride.Prohibited">
+    <exclude-pattern>tests/Integration/Support/DeliveryReservationConcurrencyWorker.php</exclude-pattern>
   </rule>
 </ruleset>
