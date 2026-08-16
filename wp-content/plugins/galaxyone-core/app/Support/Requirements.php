@@ -14,7 +14,7 @@ final class Requirements {
 	 *
 	 * @var string
 	 */
-	private const MINIMUM_PHP_VERSION = '8.1';
+	private const MINIMUM_PHP_VERSION = '8.3';
 
 	/**
 	 * Determines whether all runtime requirements are available.

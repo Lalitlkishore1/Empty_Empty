@@ -8,7 +8,7 @@ This repository currently contains GalaxyOne V1 documentation and the engineerin
 
 ## Prerequisites
 
-- PHP 8.1 or later
+- PHP 8.3 or later
 - Composer 2
 - A local WordPress installation
 - WooCommerce

@@ -4,7 +4,7 @@
  * Description: Core business-logic foundation for GalaxyOne.
  * Version: 0.2.0
  * Requires at least: 6.4
- * Requires PHP: 8.1
+ * Requires PHP: 8.3
  * Author: GalaxyOne
  * Text Domain: galaxyone-core
  *
@@ -24,11 +24,11 @@ register_activation_hook(
 	static function (): void {
 		$errors = array();
 
-		if ( version_compare( PHP_VERSION, '8.1', '<' ) ) {
+		if ( version_compare( PHP_VERSION, '8.3', '<' ) ) {
 			$errors[] = sprintf(
 				/* translators: 1: required PHP version, 2: current PHP version. */
 				__( 'GalaxyOne Core requires PHP %1$s or later. Current version: %2$s.', 'galaxyone-core' ),
-				'8.1',
+				'8.3',
 				PHP_VERSION
 			);
 		}

@@ -18,7 +18,7 @@ Business rules belong in the GalaxyOne Core plugin. Elementor is limited to layo
 
 Install the following tools before working on the repository:
 
-- PHP 8.1 or later
+- PHP 8.3 or later
 - Composer 2
 - Git
 - A local WordPress installation
@@ -81,7 +81,7 @@ composer run phpcs
 composer run test
 ```
 
-The CI environment uses PHP 8.1.
+The CI environment uses PHP 8.3.
 
 ## Coding conventions
 

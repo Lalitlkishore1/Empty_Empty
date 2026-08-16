@@ -64,7 +64,7 @@ Download the candidate artifact only after the workflow succeeds. Preserve the a
 ### Preconditions
 
 - The candidate package was produced from the reviewed source commit.
-- Staging uses supported PHP 8.1 or later, WordPress, WooCommerce, Elementor Pro, and the approved parent theme.
+- Staging uses supported PHP 8.3 or later, WordPress, WooCommerce, Elementor Pro, and the approved parent theme.
 - Staging has its own database, uploads directory, mail configuration, cache configuration, and provider credentials.
 - The staging database is not a live production database.
 - A current staging backup exists.
