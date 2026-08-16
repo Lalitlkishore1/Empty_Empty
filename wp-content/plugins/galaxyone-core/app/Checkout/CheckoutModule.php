@@ -31,6 +31,7 @@ final class CheckoutModule implements ModuleInterface {
 	 * @return void
 	 */
 	public function register(): void {
+		add_filter( 'woocommerce_payment_gateways', array( $this, 'register_payment_gateways' ) );
 		add_filter( 'woocommerce_checkout_fields', array( $this, 'configure_checkout_fields' ) );
 		add_action( 'woocommerce_after_order_notes', array( $this, 'render_delivery_selection' ) );
 		add_action( 'woocommerce_checkout_update_order_review', array( $this, 'capture_delivery_selection' ) );
@@ -38,6 +39,20 @@ final class CheckoutModule implements ModuleInterface {
 		add_action( 'woocommerce_checkout_create_order_line_item', array( $this, 'store_order_item_snapshot' ), 10, 4 );
 		add_action( 'woocommerce_checkout_create_order', array( $this, 'store_order_metadata' ), 10, 2 );
 		add_action( 'woocommerce_checkout_order_processed', array( $this, 'confirm_delivery_reservation' ), 10, 3 );
+	}
+
+	/**
+	 * Registers GalaxyOne payment gateways with WooCommerce.
+	 *
+	 * @param array<int, class-string> $gateways WooCommerce payment gateway classes.
+	 * @return array<int, class-string>
+	 */
+	public function register_payment_gateways( array $gateways ): array {
+		if ( ! in_array( UpiOnDeliveryGateway::class, $gateways, true ) ) {
+			$gateways[] = UpiOnDeliveryGateway::class;
+		}
+
+		return $gateways;
 	}
 
 	/**
