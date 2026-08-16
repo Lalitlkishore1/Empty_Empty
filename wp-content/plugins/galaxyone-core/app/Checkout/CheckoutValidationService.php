@@ -56,7 +56,9 @@ final class CheckoutValidationService {
 				'postcode'  => $postcode,
 			),
 			$date,
-			$slot_key
+			$slot_key,
+			1,
+			false
 		);
 
 		if ( $delivery_validation instanceof WP_Error ) {

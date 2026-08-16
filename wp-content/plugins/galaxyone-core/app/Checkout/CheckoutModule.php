@@ -36,9 +36,19 @@ final class CheckoutModule implements ModuleInterface {
 		add_action( 'woocommerce_after_order_notes', array( $this, 'render_delivery_selection' ) );
 		add_action( 'woocommerce_checkout_update_order_review', array( $this, 'capture_delivery_selection' ) );
 		add_action( 'woocommerce_after_checkout_validation', array( $this, 'validate_checkout' ), 10, 2 );
+		add_action(
+			'woocommerce_after_checkout_validation',
+			array( $this, 'reserve_delivery_selection' ),
+			PHP_INT_MAX,
+			2
+		);
 		add_action( 'woocommerce_checkout_create_order_line_item', array( $this, 'store_order_item_snapshot' ), 10, 4 );
 		add_action( 'woocommerce_checkout_create_order', array( $this, 'store_order_metadata' ), 10, 2 );
 		add_action( 'woocommerce_checkout_order_processed', array( $this, 'confirm_delivery_reservation' ), 10, 3 );
+		add_action(
+			'woocommerce_checkout_order_exception',
+			array( $this, 'release_delivery_reservation_after_checkout_exception' )
+		);
 	}
 
 	/**
@@ -205,6 +215,45 @@ final class CheckoutModule implements ModuleInterface {
 		if ( ! $errors->has_errors() && $cart instanceof WC_Cart ) {
 			$cart->calculate_totals();
 		}
+	}
+
+	/**
+	 * Reserves the validated delivery selection before WooCommerce creates an order.
+	 *
+	 * @param array<string, mixed> $data   Checkout data.
+	 * @param WP_Error             $errors Validation errors.
+	 * @return void
+	 */
+	public function reserve_delivery_selection( array $data, WP_Error $errors ): void {
+		unset( $data );
+
+		if ( $errors->has_errors() ) {
+			return;
+		}
+
+		$reservation = CartRecalculationService::reserve_delivery_selection();
+
+		if ( ! $reservation instanceof WP_Error ) {
+			return;
+		}
+
+		foreach ( $reservation->get_error_codes() as $error_code ) {
+			foreach ( $reservation->get_error_messages( $error_code ) as $error_message ) {
+				$errors->add( $error_code, $error_message );
+			}
+		}
+	}
+
+	/**
+	 * Releases an unconfirmed delivery reservation if WooCommerce abandons order creation.
+	 *
+	 * @param WC_Order $order Checkout order that could not be created.
+	 * @return void
+	 */
+	public function release_delivery_reservation_after_checkout_exception( WC_Order $order ): void {
+		unset( $order );
+
+		CartRecalculationService::release_cart_reservation();
 	}
 
 	/**
