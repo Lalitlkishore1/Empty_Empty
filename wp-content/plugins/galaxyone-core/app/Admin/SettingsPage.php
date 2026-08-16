@@ -32,6 +32,28 @@ final class SettingsPage {
 	 */
 	public function register_fields(): void {
 		add_settings_section(
+			'galaxyone_water_delivery_handling',
+			__( 'Water Delivery Handling', 'galaxyone-core' ),
+			array( $this, 'render_water_delivery_handling_section' ),
+			MenuRegistrar::PAGE_SLUG
+		);
+
+		foreach ( array( 1, 2, 3, 4 ) as $floor ) {
+			add_settings_field(
+				'water_stairs_floor_' . $floor . '_rate',
+				sprintf(
+					/* translators: %d: floor number. */
+					__( 'Floor %d stairs rate per Water can', 'galaxyone-core' ),
+					$floor
+				),
+				array( $this, 'render_water_stairs_rate_field' ),
+				MenuRegistrar::PAGE_SLUG,
+				'galaxyone_water_delivery_handling',
+				array( 'floor' => $floor )
+			);
+		}
+
+		add_settings_section(
 			'galaxyone_core_activity_log',
 			__( 'Activity Log', 'galaxyone-core' ),
 			array( $this, 'render_activity_log_section' ),
@@ -45,6 +67,48 @@ final class SettingsPage {
 			MenuRegistrar::PAGE_SLUG,
 			'galaxyone_core_activity_log'
 		);
+	}
+
+	/**
+	 * Renders the Water delivery-handling settings section description.
+	 *
+	 * @return void
+	 */
+	public function render_water_delivery_handling_section(): void {
+		echo '<p>' . esc_html__( 'Configure the handling charge per Water can for stairs delivery. Ground-floor and working-lift delivery have no additional handling charge.', 'galaxyone-core' ) . '</p>';
+	}
+
+	/**
+	 * Renders one independently configurable stairs rate field.
+	 *
+	 * @param array<string, mixed> $args Settings field arguments.
+	 * @return void
+	 */
+	public function render_water_stairs_rate_field( array $args ): void {
+		$floor = isset( $args['floor'] ) ? absint( $args['floor'] ) : 0;
+
+		if ( $floor < 1 || $floor > 4 ) {
+			return;
+		}
+
+		$settings = SettingsRepository::get_settings();
+		$key      = 'water_stairs_floor_' . $floor . '_rate';
+		$value    = isset( $settings[ $key ] ) && is_scalar( $settings[ $key ] )
+			? (string) $settings[ $key ]
+			: '';
+		?>
+		<input
+			id="galaxyone-water-stairs-floor-<?php echo esc_attr( (string) $floor ); ?>-rate"
+			name="<?php echo esc_attr( SettingsRepository::OPTION_NAME ); ?>[<?php echo esc_attr( $key ); ?>]"
+			type="text"
+			inputmode="decimal"
+			value="<?php echo esc_attr( $value ); ?>"
+			required
+		/>
+		<p class="description">
+			<?php esc_html_e( 'Enter a non-negative amount per Water can.', 'galaxyone-core' ); ?>
+		</p>
+		<?php
 	}
 
 	/**

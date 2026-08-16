@@ -15,6 +15,8 @@ use GalaxyOne\Core\Cart\CartRecalculationService;
 use GalaxyOne\Core\Contracts\ModuleInterface;
 use GalaxyOne\Core\Delivery\DeliverySlotService;
 use GalaxyOne\Core\Orders\OrderMetaService;
+use GalaxyOne\Core\Pricing\WaterDeliveryHandlingService;
+use WC_Cart;
 use WC_Order;
 use WC_Order_Item_Product;
 use WP_Error;
@@ -59,8 +61,11 @@ final class CheckoutModule implements ModuleInterface {
 	 * @return void
 	 */
 	public function render_delivery_selection( object $checkout ): void {
-		$selection = CartRecalculationService::get_delivery_selection();
-		$options   = $this->get_delivery_options();
+		$selection            = CartRecalculationService::get_delivery_selection();
+		$options              = $this->get_delivery_options();
+		$cart                 = WC()->cart;
+		$has_water            = $cart instanceof WC_Cart && WaterDeliveryHandlingService::cart_contains_water( $cart );
+		$water_access_options = WaterDeliveryHandlingService::get_access_options();
 
 		$template = GALAXYONE_CORE_PATH . 'templates/checkout/delivery-selection.php';
 
@@ -99,13 +104,21 @@ final class CheckoutModule implements ModuleInterface {
 		$slot_key  = isset( $fields['galaxyone_delivery_slot'] ) && is_scalar( $fields['galaxyone_delivery_slot'] )
 			? (string) $fields['galaxyone_delivery_slot']
 			: '';
+		$water_access = isset( $fields['galaxyone_water_delivery_access'] ) && is_scalar( $fields['galaxyone_water_delivery_access'] )
+			? (string) $fields['galaxyone_water_delivery_access']
+			: '';
+		$water_floor  = isset( $fields['galaxyone_water_delivery_floor'] ) && is_scalar( $fields['galaxyone_water_delivery_floor'] )
+			? (string) $fields['galaxyone_water_delivery_floor']
+			: '';
 
 		CartRecalculationService::update_delivery_selection(
 			$postcode,
 			$date,
 			$slot_key,
 			$address_1,
-			$city
+			$city,
+			$water_access,
+			$water_floor
 		);
 	}
 
@@ -135,13 +148,21 @@ final class CheckoutModule implements ModuleInterface {
 		$slot_key = isset( $_POST['galaxyone_delivery_slot'] ) && is_scalar( $_POST['galaxyone_delivery_slot'] ) // phpcs:ignore WordPress.Security.NonceVerification.Missing -- WooCommerce validates the checkout request.
 			? sanitize_key( wp_unslash( (string) $_POST['galaxyone_delivery_slot'] ) ) // phpcs:ignore WordPress.Security.NonceVerification.Missing -- WooCommerce validates the checkout request.
 			: '';
+		$water_access = isset( $_POST['galaxyone_water_delivery_access'] ) && is_scalar( $_POST['galaxyone_water_delivery_access'] ) // phpcs:ignore WordPress.Security.NonceVerification.Missing -- WooCommerce validates the checkout request.
+			? sanitize_key( wp_unslash( (string) $_POST['galaxyone_water_delivery_access'] ) ) // phpcs:ignore WordPress.Security.NonceVerification.Missing -- WooCommerce validates the checkout request.
+			: '';
+		$water_floor  = isset( $_POST['galaxyone_water_delivery_floor'] ) && is_scalar( $_POST['galaxyone_water_delivery_floor'] ) // phpcs:ignore WordPress.Security.NonceVerification.Missing -- WooCommerce validates the checkout request.
+			? sanitize_text_field( wp_unslash( (string) $_POST['galaxyone_water_delivery_floor'] ) ) // phpcs:ignore WordPress.Security.NonceVerification.Missing -- WooCommerce validates the checkout request.
+			: '';
 
 		CartRecalculationService::update_delivery_selection(
 			$postcode,
 			$date,
 			$slot_key,
 			$address_1,
-			$city
+			$city,
+			$water_access,
+			$water_floor
 		);
 
 		$validation_errors = CheckoutValidationService::validate( $data );
@@ -156,6 +177,18 @@ final class CheckoutModule implements ModuleInterface {
 					$errors->add( $error_code, $error_message );
 				}
 			}
+		}
+
+		/*
+		 * The final submitted delivery selection can differ from the most recent
+		 * checkout AJAX refresh. Recalculate the normal WooCommerce totals before
+		 * order creation so its fee callback resolves and stores the same current
+		 * Water handling result that order metadata will snapshot.
+		 */
+		$cart = WC()->cart;
+
+		if ( ! $errors->has_errors() && $cart instanceof WC_Cart ) {
+			$cart->calculate_totals();
 		}
 	}
 

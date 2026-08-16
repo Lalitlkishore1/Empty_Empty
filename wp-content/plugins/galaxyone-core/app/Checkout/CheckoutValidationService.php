@@ -9,6 +9,8 @@ namespace GalaxyOne\Core\Checkout;
 
 use GalaxyOne\Core\Cart\CartRecalculationService;
 use GalaxyOne\Core\Delivery\DeliveryValidationService;
+use GalaxyOne\Core\Pricing\WaterDeliveryHandlingService;
+use WC_Cart;
 use WP_Error;
 
 final class CheckoutValidationService {
@@ -59,6 +61,22 @@ final class CheckoutValidationService {
 
 		if ( $delivery_validation instanceof WP_Error ) {
 			$errors[] = $delivery_validation;
+
+			return $errors;
+		}
+
+		$cart = WC()->cart;
+
+		if ( $cart instanceof WC_Cart && WaterDeliveryHandlingService::cart_contains_water( $cart ) ) {
+			$water_handling = WaterDeliveryHandlingService::resolve(
+				$cart,
+				(string) $selection['water_access'],
+				(string) $selection['water_floor']
+			);
+
+			if ( $water_handling instanceof WP_Error ) {
+				$errors[] = $water_handling;
+			}
 		}
 
 		return $errors;

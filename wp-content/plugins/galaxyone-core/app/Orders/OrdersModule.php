@@ -42,6 +42,10 @@ final class OrdersModule implements ModuleInterface {
 	 */
 	public function register(): void {
 		add_action( 'admin_menu', array( $this, 'register_menu' ), 20 );
+		add_action(
+			'woocommerce_admin_order_data_after_shipping_address',
+			array( OrderMetaService::class, 'render_water_delivery_handling_snapshot' )
+		);
 		$this->actions->register();
 	}
 

@@ -11,6 +11,7 @@ use GalaxyOne\Core\Cart\CartRecalculationService;
 use GalaxyOne\Core\Delivery\DeliveryReservationService;
 use GalaxyOne\Core\Delivery\DeliverySlotService;
 use GalaxyOne\Core\Delivery\ServiceAreaService;
+use GalaxyOne\Core\Pricing\WaterDeliveryHandlingService;
 use WC_Order;
 use WC_Order_Item_Product;
 
@@ -71,6 +72,7 @@ final class OrderMetaService {
 		$slot        = DeliverySlotService::get_slot( (string) $selection['slot_key'] );
 		$area        = ServiceAreaService::get_service_area( (string) $selection['postcode'] );
 		$reservation = CartRecalculationService::get_delivery_reservation();
+		$water_handling = CartRecalculationService::get_water_delivery_handling_snapshot();
 		$landmark    = isset( $data['galaxyone_landmark'] ) && is_scalar( $data['galaxyone_landmark'] )
 			? sanitize_text_field( (string) $data['galaxyone_landmark'] )
 			: '';
@@ -96,6 +98,69 @@ final class OrderMetaService {
 				: ''
 		);
 		$order->update_meta_data( '_galaxyone_landmark', $landmark );
+
+		if ( self::is_valid_water_delivery_handling_snapshot( $water_handling ) ) {
+			$order->update_meta_data(
+				'_galaxyone_water_delivery_handling_snapshot',
+				wp_json_encode(
+					array(
+						'access_type'   => sanitize_key( (string) $water_handling['access_type'] ),
+						'floor'         => absint( $water_handling['floor'] ),
+						'rate'          => (string) $water_handling['rate'],
+						'water_quantity' => absint( $water_handling['water_quantity'] ),
+						'charge'        => (string) $water_handling['charge'],
+					)
+				)
+			);
+		}
+	}
+
+	/**
+	 * Renders stored Water delivery-handling details in the WooCommerce order view.
+	 *
+	 * @param WC_Order $order WooCommerce order.
+	 * @return void
+	 */
+	public static function render_water_delivery_handling_snapshot( WC_Order $order ): void {
+		$raw_snapshot = $order->get_meta( '_galaxyone_water_delivery_handling_snapshot', true );
+		$snapshot     = is_string( $raw_snapshot ) ? json_decode( $raw_snapshot, true ) : null;
+
+		if ( ! is_array( $snapshot ) || ! self::is_valid_water_delivery_handling_snapshot( $snapshot ) ) {
+			return;
+		}
+
+		$access_label = WaterDeliveryHandlingService::get_access_label( (string) $snapshot['access_type'] );
+
+		if ( '' === $access_label ) {
+			return;
+		}
+		?>
+		<section class="galaxyone-water-delivery-handling">
+			<h3><?php esc_html_e( 'Water delivery handling', 'galaxyone-core' ); ?></h3>
+			<p>
+				<strong><?php esc_html_e( 'Delivery access:', 'galaxyone-core' ); ?></strong>
+				<?php echo esc_html( $access_label ); ?>
+			</p>
+			<?php if ( absint( $snapshot['floor'] ) > 0 ) : ?>
+				<p>
+					<strong><?php esc_html_e( 'Floor:', 'galaxyone-core' ); ?></strong>
+					<?php echo esc_html( (string) absint( $snapshot['floor'] ) ); ?>
+				</p>
+			<?php endif; ?>
+			<p>
+				<strong><?php esc_html_e( 'Water quantity:', 'galaxyone-core' ); ?></strong>
+				<?php echo esc_html( (string) absint( $snapshot['water_quantity'] ) ); ?>
+			</p>
+			<p>
+				<strong><?php esc_html_e( 'Per-can rate:', 'galaxyone-core' ); ?></strong>
+				<?php echo wp_kses_post( wc_price( (string) $snapshot['rate'] ) ); ?>
+			</p>
+			<p>
+				<strong><?php esc_html_e( 'Total Water handling charge:', 'galaxyone-core' ); ?></strong>
+				<?php echo wp_kses_post( wc_price( (string) $snapshot['charge'] ) ); ?>
+			</p>
+		</section>
+		<?php
 	}
 
 	/**
@@ -144,5 +209,27 @@ final class OrderMetaService {
 		}
 
 		return DeliveryReservationService::release( $reservation_token, $status );
+	}
+
+	/**
+	 * Determines whether an authoritative Water handling snapshot has all required values.
+	 *
+	 * @param array<string, mixed> $snapshot Water delivery-handling snapshot.
+	 * @return bool
+	 */
+	private static function is_valid_water_delivery_handling_snapshot( array $snapshot ): bool {
+		return isset(
+			$snapshot['access_type'],
+			$snapshot['floor'],
+			$snapshot['rate'],
+			$snapshot['water_quantity'],
+			$snapshot['charge']
+		) &&
+			'' !== WaterDeliveryHandlingService::get_access_label( (string) $snapshot['access_type'] ) &&
+			absint( $snapshot['water_quantity'] ) > 0 &&
+			is_numeric( $snapshot['rate'] ) &&
+			(float) $snapshot['rate'] >= 0 &&
+			is_numeric( $snapshot['charge'] ) &&
+			(float) $snapshot['charge'] >= 0;
 	}
 }

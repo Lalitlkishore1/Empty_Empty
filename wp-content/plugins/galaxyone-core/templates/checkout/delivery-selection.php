@@ -6,12 +6,18 @@
  *
  * @var array<string, string> $selection Current delivery selection.
  * @var array<string, mixed>  $options   Available delivery options.
+ * @var bool                   $has_water Whether the cart contains Water.
+ * @var array<string, string> $water_access_options Water access options.
  */
 
 defined( 'ABSPATH' ) || exit;
 
 $selection = isset( $selection ) && is_array( $selection ) ? $selection : array();
 $options   = isset( $options ) && is_array( $options ) ? $options : array();
+$has_water = isset( $has_water ) && true === $has_water;
+$water_access_options = isset( $water_access_options ) && is_array( $water_access_options )
+	? $water_access_options
+	: array();
 
 $selected_date = isset( $selection['delivery_date'] ) && is_scalar( $selection['delivery_date'] )
 	? sanitize_text_field( (string) $selection['delivery_date'] )
@@ -27,6 +33,12 @@ $slots         = isset( $options['slots'] ) && is_array( $options['slots'] )
 	: array();
 $date_options  = array();
 $slot_options  = array();
+$water_access  = isset( $selection['water_access'] ) && is_scalar( $selection['water_access'] )
+	? sanitize_key( (string) $selection['water_access'] )
+	: '';
+$water_floor   = isset( $selection['water_floor'] ) && is_scalar( $selection['water_floor'] )
+	? sanitize_text_field( (string) $selection['water_floor'] )
+	: '';
 
 foreach ( $dates as $date ) {
 	if ( ! is_scalar( $date ) ) {
@@ -97,6 +109,52 @@ foreach ( $slots as $slot ) {
 			),
 			$selected_slot
 		);
+
+		if ( $has_water ) {
+			$access_options = array(
+				'' => __( 'Select delivery access', 'galaxyone-core' ),
+			);
+
+			foreach ( $water_access_options as $access_key => $access_label ) {
+				if ( ! is_string( $access_key ) || ! is_scalar( $access_label ) ) {
+					continue;
+				}
+
+				$access_key = sanitize_key( $access_key );
+
+				if ( '' !== $access_key ) {
+					$access_options[ $access_key ] = sanitize_text_field( (string) $access_label );
+				}
+			}
+
+			woocommerce_form_field(
+				'galaxyone_water_delivery_access',
+				array(
+					'type'     => 'select',
+					'label'    => __( 'Water delivery access', 'galaxyone-core' ),
+					'required' => true,
+					'class'    => array( 'form-row-wide' ),
+					'options'  => $access_options,
+				),
+				$water_access
+			);
+
+			woocommerce_form_field(
+				'galaxyone_water_delivery_floor',
+				array(
+					'type'              => 'number',
+					'label'             => __( 'Floor for stairs delivery', 'galaxyone-core' ),
+					'required'          => false,
+					'class'             => array( 'form-row-wide' ),
+					'custom_attributes' => array(
+						'min'  => '1',
+						'step' => '1',
+					),
+					'description'       => __( 'Required only when stairs are selected. Floor 5 or above requires manual delivery confirmation.', 'galaxyone-core' ),
+				),
+				$water_floor
+			);
+		}
 		?>
 	<?php else : ?>
 		<p class="form-row form-row-wide">

@@ -11,6 +11,7 @@ use GalaxyOne\Core\Delivery\DeliveryReservationService;
 use GalaxyOne\Core\Delivery\DeliveryValidationService;
 use GalaxyOne\Core\Offers\FreeDeliveryOfferService;
 use GalaxyOne\Core\Pricing\PriceSnapshotService;
+use GalaxyOne\Core\Pricing\WaterDeliveryHandlingService;
 use WC_Cart;
 use WP_Error;
 
@@ -50,6 +51,13 @@ final class CartRecalculationService {
 	 * @var string
 	 */
 	private const DELIVERY_FEE_SESSION_KEY = 'galaxyone_delivery_fee';
+
+	/**
+	 * Customer-session key for the authoritative Water handling snapshot.
+	 *
+	 * @var string
+	 */
+	private const WATER_DELIVERY_HANDLING_SESSION_KEY = 'galaxyone_water_delivery_handling';
 
 	/**
 	 * Recalculates every cart item's price using the authoritative resolver.
@@ -105,6 +113,7 @@ final class CartRecalculationService {
 
 		if ( ! self::has_complete_delivery_selection( $selection ) ) {
 			self::set_session_value( self::DELIVERY_FEE_SESSION_KEY, array() );
+			self::set_session_value( self::WATER_DELIVERY_HANDLING_SESSION_KEY, array() );
 
 			return;
 		}
@@ -121,6 +130,7 @@ final class CartRecalculationService {
 
 		if ( $validation instanceof WP_Error ) {
 			self::set_session_value( self::DELIVERY_FEE_SESSION_KEY, array() );
+			self::set_session_value( self::WATER_DELIVERY_HANDLING_SESSION_KEY, array() );
 
 			return;
 		}
@@ -145,6 +155,8 @@ final class CartRecalculationService {
 				false
 			);
 		}
+
+		self::apply_water_delivery_handling( $cart, $selection );
 	}
 
 	/**
@@ -158,6 +170,8 @@ final class CartRecalculationService {
 	 * @param string $slot_key      Selected slot key.
 	 * @param string $address_1     Selected delivery address line.
 	 * @param string $city          Selected delivery locality.
+	 * @param string $water_access  Selected Water delivery-access type.
+	 * @param string $water_floor   Selected Water stairs floor.
 	 * @return void
 	 */
 	public static function update_delivery_selection(
@@ -165,7 +179,9 @@ final class CartRecalculationService {
 		string $delivery_date,
 		string $slot_key,
 		string $address_1 = '',
-		string $city = ''
+		string $city = '',
+		string $water_access = '',
+		string $water_floor = ''
 	): void {
 		$selection = array(
 			'postcode'      => strtoupper( preg_replace( '/\s+/', '', sanitize_text_field( $postcode ) ) ),
@@ -173,6 +189,8 @@ final class CartRecalculationService {
 			'slot_key'      => sanitize_title( $slot_key ),
 			'address_1'     => sanitize_text_field( $address_1 ),
 			'city'          => sanitize_text_field( $city ),
+			'water_access'  => sanitize_key( $water_access ),
+			'water_floor'   => sanitize_text_field( $water_floor ),
 		);
 		$current   = self::get_delivery_selection();
 
@@ -205,6 +223,8 @@ final class CartRecalculationService {
 				'slot_key'      => '',
 				'address_1'     => '',
 				'city'          => '',
+				'water_access'  => '',
+				'water_floor'   => '',
 			);
 		}
 
@@ -223,6 +243,12 @@ final class CartRecalculationService {
 				: '',
 			'city'          => isset( $selection['city'] ) && is_scalar( $selection['city'] )
 				? sanitize_text_field( (string) $selection['city'] )
+				: '',
+			'water_access'  => isset( $selection['water_access'] ) && is_scalar( $selection['water_access'] )
+				? sanitize_key( (string) $selection['water_access'] )
+				: '',
+			'water_floor'   => isset( $selection['water_floor'] ) && is_scalar( $selection['water_floor'] )
+				? sanitize_text_field( (string) $selection['water_floor'] )
 				: '',
 		);
 	}
@@ -253,6 +279,75 @@ final class CartRecalculationService {
 			'campaign_key' => isset( $fee['campaign_key'] ) && is_scalar( $fee['campaign_key'] )
 				? sanitize_title( (string) $fee['campaign_key'] )
 				: '',
+		);
+	}
+
+	/**
+	 * Returns the current authoritative Water delivery-handling snapshot.
+	 *
+	 * @return array<string, int|string>
+	 */
+	public static function get_water_delivery_handling_snapshot(): array {
+		$snapshot = self::get_session_value( self::WATER_DELIVERY_HANDLING_SESSION_KEY );
+
+		if ( ! is_array( $snapshot ) ) {
+			return array();
+		}
+
+		return array(
+			'access_type'   => isset( $snapshot['access_type'] ) && is_scalar( $snapshot['access_type'] )
+				? sanitize_key( (string) $snapshot['access_type'] )
+				: '',
+			'floor'         => isset( $snapshot['floor'] ) ? absint( $snapshot['floor'] ) : 0,
+			'rate'          => isset( $snapshot['rate'] ) && is_scalar( $snapshot['rate'] )
+				? (string) $snapshot['rate']
+				: '',
+			'water_quantity' => isset( $snapshot['water_quantity'] ) ? absint( $snapshot['water_quantity'] ) : 0,
+			'charge'        => isset( $snapshot['charge'] ) && is_scalar( $snapshot['charge'] )
+				? (string) $snapshot['charge']
+				: '',
+		);
+	}
+
+	/**
+	 * Resolves and applies one authoritative Water delivery-handling fee.
+	 *
+	 * WooCommerce clears cart fees before each totals calculation, so adding at
+	 * most one resolved fee here remains safe across repeated recalculations.
+	 *
+	 * @param WC_Cart              $cart      WooCommerce cart.
+	 * @param array<string, string> $selection Current delivery selection.
+	 * @return void
+	 */
+	private static function apply_water_delivery_handling( WC_Cart $cart, array $selection ): void {
+		if ( ! WaterDeliveryHandlingService::cart_contains_water( $cart ) ) {
+			self::set_session_value( self::WATER_DELIVERY_HANDLING_SESSION_KEY, array() );
+
+			return;
+		}
+
+		$handling = WaterDeliveryHandlingService::resolve(
+			$cart,
+			(string) $selection['water_access'],
+			(string) $selection['water_floor']
+		);
+
+		if ( $handling instanceof WP_Error ) {
+			self::set_session_value( self::WATER_DELIVERY_HANDLING_SESSION_KEY, array() );
+
+			return;
+		}
+
+		self::set_session_value( self::WATER_DELIVERY_HANDLING_SESSION_KEY, $handling );
+
+		if ( (float) $handling['charge'] <= 0 ) {
+			return;
+		}
+
+		$cart->add_fee(
+			__( 'Water delivery handling', 'galaxyone-core' ),
+			(float) $handling['charge'],
+			false
 		);
 	}
 
