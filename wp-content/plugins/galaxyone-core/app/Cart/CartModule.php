@@ -66,8 +66,8 @@ final class CartModule implements ModuleInterface {
 		bool $passed,
 		int $product_id,
 		int $quantity,
-		int $variation_id,
-		array $variations
+		int $variation_id = 0,
+		array $variations = array()
 	): bool {
 		unset( $quantity, $variations );
 
