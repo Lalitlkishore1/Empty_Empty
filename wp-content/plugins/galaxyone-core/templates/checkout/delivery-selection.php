@@ -31,8 +31,13 @@ $dates         = isset( $options['dates'] ) && is_array( $options['dates'] )
 $slots         = isset( $options['slots'] ) && is_array( $options['slots'] )
 	? $options['slots']
 	: array();
+$slots_by_date = isset( $options['slots_by_date'] ) && is_array( $options['slots_by_date'] )
+	? $options['slots_by_date']
+	: array();
 $date_options  = array();
 $slot_options  = array();
+$slot_labels   = array();
+$slot_availability = array();
 $water_access  = isset( $selection['water_access'] ) && is_scalar( $selection['water_access'] )
 	? sanitize_key( (string) $selection['water_access'] )
 	: '';
@@ -66,7 +71,39 @@ foreach ( $slots as $slot ) {
 	$slot_label = sanitize_text_field( (string) $slot->label );
 
 	if ( '' !== $slot_key && '' !== $slot_label ) {
-		$slot_options[ $slot_key ] = $slot_label;
+		$slot_labels[ $slot_key ] = $slot_label;
+	}
+}
+
+foreach ( $slots_by_date as $available_date => $available_slots ) {
+	if ( ! is_scalar( $available_date ) || ! is_array( $available_slots ) ) {
+		continue;
+	}
+
+	$available_date = sanitize_text_field( (string) $available_date );
+
+	if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $available_date ) ) {
+		continue;
+	}
+
+	$slot_availability[ $available_date ] = array();
+
+	foreach ( $available_slots as $available_slot ) {
+		if ( ! is_object( $available_slot ) || ! isset( $available_slot->rule_key ) || ! is_scalar( $available_slot->rule_key ) ) {
+			continue;
+		}
+
+		$available_slot_key = sanitize_title( (string) $available_slot->rule_key );
+
+		if ( isset( $slot_labels[ $available_slot_key ] ) ) {
+			$slot_availability[ $available_date ][] = $available_slot_key;
+		}
+	}
+}
+
+if ( isset( $slot_availability[ $selected_date ] ) ) {
+	foreach ( $slot_availability[ $selected_date ] as $available_slot_key ) {
+		$slot_options[ $available_slot_key ] = $slot_labels[ $available_slot_key ];
 	}
 }
 ?>
@@ -76,7 +113,7 @@ foreach ( $slots as $slot ) {
 		<?php esc_html_e( 'Delivery selection', 'galaxyone-core' ); ?>
 	</h3>
 
-	<?php if ( empty( $date_options ) || empty( $slot_options ) ) : ?>
+	<?php if ( empty( $date_options ) || empty( $slot_labels ) ) : ?>
 		<p>
 			<?php esc_html_e( 'Delivery dates or time slots are currently unavailable. Please try again later.', 'galaxyone-core' ); ?>
 		</p>
@@ -194,3 +231,39 @@ foreach ( $slots as $slot ) {
 		</p>
 	<?php endif; ?>
 </section>
+
+<script>
+	(function () {
+		const dateField = document.getElementById( 'galaxyone_delivery_date' );
+		const slotField = document.getElementById( 'galaxyone_delivery_slot' );
+		const slotLabels = <?php echo wp_json_encode( $slot_labels, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Encoded JSON contains only sanitized checkout option data. ?>;
+		const slotAvailability = <?php echo wp_json_encode( $slot_availability, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Encoded JSON contains only sanitized checkout option data. ?>;
+
+		if ( ! dateField || ! slotField ) {
+			return;
+		}
+
+		const updateSlots = function () {
+			const selectedSlot = slotField.value;
+			const availableSlots = slotAvailability[ dateField.value ] || [];
+
+			slotField.replaceChildren();
+			slotField.add( new Option( '<?php echo esc_js( __( 'Select a delivery time slot', 'galaxyone-core' ) ); ?>', '' ) );
+
+			availableSlots.forEach( function ( slotKey ) {
+				if ( ! Object.prototype.hasOwnProperty.call( slotLabels, slotKey ) ) {
+					return;
+				}
+
+				slotField.add( new Option( slotLabels[ slotKey ], slotKey ) );
+			} );
+
+			if ( availableSlots.includes( selectedSlot ) ) {
+				slotField.value = selectedSlot;
+			}
+		};
+
+		dateField.addEventListener( 'change', updateSlots );
+		updateSlots();
+	}());
+</script>

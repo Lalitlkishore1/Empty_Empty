@@ -7,6 +7,8 @@
 
 namespace GalaxyOne\Core\Delivery;
 
+use DateTimeImmutable;
+use DateTimeInterface;
 use GalaxyOne\Core\Database\Migrations\CreateDeliveryRulesTable;
 
 final class DeliverySlotService {
@@ -172,6 +174,37 @@ final class DeliverySlotService {
 	}
 
 	/**
+	 * Returns active delivery slots available on a date.
+	 *
+	 * @param string $delivery_date Date in Y-m-d format.
+	 * @return array<int, object>
+	 */
+	public static function get_available_slots( string $delivery_date ): array {
+		$available_slots = array();
+
+		foreach ( self::get_slots() as $slot ) {
+			if ( ! is_object( $slot ) || ! isset( $slot->rule_key ) || ! is_scalar( $slot->rule_key ) ) {
+				continue;
+			}
+
+			if ( self::is_slot_available( $delivery_date, (string) $slot->rule_key ) ) {
+				$available_slots[] = $slot;
+			}
+		}
+
+		return $available_slots;
+	}
+
+	/**
+	 * Returns the current delivery date in the WordPress timezone.
+	 *
+	 * @return string
+	 */
+	public static function get_current_delivery_date(): string {
+		return self::get_current_datetime()->format( 'Y-m-d' );
+	}
+
+	/**
 	 * Returns one active delivery slot.
 	 *
 	 * @param string $slot_key Slot identifier.
@@ -229,29 +262,68 @@ final class DeliverySlotService {
 		}
 
 		$slot = self::get_slot( $slot_key );
+		$now  = self::get_current_datetime();
 
-		if ( ! is_array( $slot ) || $delivery_date < wp_date( 'Y-m-d' ) ) {
+		if ( ! is_array( $slot ) || $delivery_date < $now->format( 'Y-m-d' ) ) {
 			return false;
 		}
 
-		$weekday = (int) wp_date(
-			'w',
-			strtotime( $delivery_date . ' 00:00:00' )
+		$delivery_datetime = DateTimeImmutable::createFromFormat(
+			'!Y-m-d',
+			$delivery_date,
+			wp_timezone()
 		);
+
+		if ( false === $delivery_datetime ) {
+			return false;
+		}
+
+		$weekday = (int) $delivery_datetime->format( 'w' );
 
 		if ( -1 !== $slot['weekday'] && $weekday !== $slot['weekday'] ) {
 			return false;
 		}
 
 		if (
-			$delivery_date === wp_date( 'Y-m-d' ) &&
+			$delivery_date === $now->format( 'Y-m-d' ) &&
 			'' !== $slot['cutoff_time'] &&
-			current_time( 'H:i' ) >= substr( $slot['cutoff_time'], 0, 5 )
+			$now->format( 'H:i' ) >= substr( $slot['cutoff_time'], 0, 5 )
 		) {
 			return false;
 		}
 
+		if ( $delivery_date === $now->format( 'Y-m-d' ) ) {
+			$slot_end = DateTimeImmutable::createFromFormat(
+				'!Y-m-d H:i:s',
+				$delivery_date . ' ' . $slot['end_time'],
+				wp_timezone()
+			);
+
+			if ( false === $slot_end || $now >= $slot_end ) {
+				return false;
+			}
+		}
+
 		return true;
+	}
+
+	/**
+	 * Returns the current application datetime in the WordPress timezone.
+	 *
+	 * @return DateTimeImmutable
+	 */
+	private static function get_current_datetime(): DateTimeImmutable {
+		$timezone = wp_timezone();
+		$now      = apply_filters(
+			'galaxyone_delivery_current_datetime',
+			new DateTimeImmutable( 'now', $timezone )
+		);
+
+		if ( $now instanceof DateTimeInterface ) {
+			return DateTimeImmutable::createFromInterface( $now )->setTimezone( $timezone );
+		}
+
+		return new DateTimeImmutable( 'now', $timezone );
 	}
 
 	/**

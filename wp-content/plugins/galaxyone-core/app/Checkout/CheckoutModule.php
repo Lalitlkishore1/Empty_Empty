@@ -304,12 +304,16 @@ final class CheckoutModule implements ModuleInterface {
 	 */
 	private function get_delivery_options(): array {
 		$options = array(
-			'dates' => array(),
-			'slots' => array(),
+			'dates'         => array(),
+			'slots'         => array(),
+			'slots_by_date' => array(),
 		);
 
 		try {
-			$today = new DateTimeImmutable( 'today', wp_timezone() );
+			$today = new DateTimeImmutable(
+				DeliverySlotService::get_current_delivery_date(),
+				wp_timezone()
+			);
 
 			for ( $day_offset = 0; $day_offset < 14; ++$day_offset ) {
 				$date = $today->add( new DateInterval( 'P' . $day_offset . 'D' ) );
@@ -325,10 +329,17 @@ final class CheckoutModule implements ModuleInterface {
 			}
 
 			$options['slots'] = DeliverySlotService::get_slots();
+
+			foreach ( $options['dates'] as $delivery_date ) {
+				$options['slots_by_date'][ $delivery_date ] = DeliverySlotService::get_available_slots(
+					$delivery_date
+				);
+			}
 		} catch ( \Exception $exception ) {
 			$options = array(
-				'dates' => array(),
-				'slots' => array(),
+				'dates'         => array(),
+				'slots'         => array(),
+				'slots_by_date' => array(),
 			);
 		}
 
