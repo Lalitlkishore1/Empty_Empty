@@ -187,7 +187,10 @@ final class DeliverySlotService {
 				continue;
 			}
 
-			if ( self::is_slot_available( $delivery_date, (string) $slot->rule_key ) ) {
+			if (
+				self::is_slot_available( $delivery_date, (string) $slot->rule_key ) &&
+				DeliveryCapacityService::has_capacity( $delivery_date, (string) $slot->rule_key )
+			) {
 				$available_slots[] = $slot;
 			}
 		}

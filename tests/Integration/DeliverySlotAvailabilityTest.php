@@ -216,6 +216,131 @@ final class DeliverySlotAvailabilityTest extends IntegrationTestCase {
 		self::assertTrue(
 			DeliverySlotService::is_slot_available( $this->future_delivery_date, $this->slot_key )
 		);
+		self::assertContains( $this->slot_key, $this->get_available_slot_keys( $this->future_delivery_date ) );
+	}
+
+	public function test_missing_capacity_is_not_offered_or_exposed_by_checkout_options(): void {
+		$this->set_current_datetime( '2026-08-17 12:23:00' );
+		$this->delete_capacity( $this->future_delivery_date );
+
+		$capacity_row_count = $this->get_capacity_row_count( $this->future_delivery_date );
+		$reservation_count  = $this->get_reservation_count( $this->future_delivery_date );
+
+		self::assertFalse(
+			DeliveryCapacityService::has_capacity(
+				$this->future_delivery_date,
+				$this->slot_key
+			)
+		);
+		self::assertNotContains( $this->slot_key, $this->get_available_slot_keys( $this->future_delivery_date ) );
+		self::assertNotContains( $this->slot_key, $this->get_checkout_slot_keys( $this->future_delivery_date ) );
+
+		$validation = DeliveryValidationService::validate(
+			$this->get_address(),
+			$this->future_delivery_date,
+			$this->slot_key
+		);
+
+		self::assertInstanceOf( WP_Error::class, $validation );
+		self::assertSame( 'galaxyone_delivery_capacity_full', $validation->get_error_code() );
+		self::assertSame( $capacity_row_count, $this->get_capacity_row_count( $this->future_delivery_date ) );
+		self::assertSame( $reservation_count, $this->get_reservation_count( $this->future_delivery_date ) );
+	}
+
+	public function test_full_capacity_is_not_offered_or_exposed_by_checkout_options(): void {
+		$this->set_current_datetime( '2026-08-17 12:23:00' );
+		$this->set_capacity( $this->future_delivery_date, 5 );
+		$this->set_reserved_count( $this->future_delivery_date, 5 );
+
+		self::assertFalse(
+			DeliveryCapacityService::has_capacity(
+				$this->future_delivery_date,
+				$this->slot_key
+			)
+		);
+		self::assertNotContains( $this->slot_key, $this->get_available_slot_keys( $this->future_delivery_date ) );
+		self::assertNotContains( $this->slot_key, $this->get_checkout_slot_keys( $this->future_delivery_date ) );
+	}
+
+	public function test_usable_capacity_is_offered_without_availability_mutation(): void {
+		$this->set_current_datetime( '2026-08-17 12:23:00' );
+		$this->set_capacity( $this->future_delivery_date, 5 );
+
+		$initial_capacity    = $this->get_capacity( $this->future_delivery_date );
+		$initial_reservations = $this->get_reservation_count( $this->future_delivery_date );
+
+		self::assertTrue(
+			DeliveryCapacityService::has_capacity(
+				$this->future_delivery_date,
+				$this->slot_key
+			)
+		);
+		self::assertContains( $this->slot_key, $this->get_available_slot_keys( $this->future_delivery_date ) );
+		self::assertContains( $this->slot_key, $this->get_checkout_slot_keys( $this->future_delivery_date ) );
+
+		$validation = DeliveryValidationService::validate(
+			$this->get_address(),
+			$this->future_delivery_date,
+			$this->slot_key
+		);
+
+		self::assertNotInstanceOf( WP_Error::class, $validation );
+		self::assertSame( $initial_capacity, $this->get_capacity( $this->future_delivery_date ) );
+		self::assertSame( $initial_reservations, $this->get_reservation_count( $this->future_delivery_date ) );
+
+		$this->set_reserved_count( $this->future_delivery_date, 4 );
+
+		self::assertTrue(
+			DeliveryCapacityService::has_capacity(
+				$this->future_delivery_date,
+				$this->slot_key
+			)
+		);
+		self::assertContains( $this->slot_key, $this->get_available_slot_keys( $this->future_delivery_date ) );
+		self::assertContains( $this->slot_key, $this->get_checkout_slot_keys( $this->future_delivery_date ) );
+	}
+
+	public function test_capacity_aware_availability_does_not_weaken_cutoff_rules(): void {
+		$this->set_current_datetime( '2026-08-17 11:30:00' );
+
+		self::assertTrue(
+			DeliverySlotService::save_slot(
+				$this->slot_key,
+				'Delivery Slot Availability',
+				-1,
+				'10:00',
+				'12:00',
+				'11:00'
+			)
+		);
+		self::assertNotContains( $this->slot_key, $this->get_available_slot_keys( $this->delivery_date ) );
+	}
+
+	public function test_availability_snapshot_does_not_replace_atomic_reservation_protection(): void {
+		$this->set_current_datetime( '2026-08-17 12:23:00' );
+		$this->set_capacity( $this->future_delivery_date, 5 );
+		$this->set_reserved_count( $this->future_delivery_date, 4 );
+
+		self::assertContains( $this->slot_key, $this->get_available_slot_keys( $this->future_delivery_date ) );
+		self::assertContains( $this->slot_key, $this->get_checkout_slot_keys( $this->future_delivery_date ) );
+
+		$this->create_reservation( $this->future_delivery_date );
+
+		$failed_reservation = DeliveryValidationService::reserve(
+			$this->get_address(),
+			$this->future_delivery_date,
+			$this->slot_key,
+			1,
+			0,
+			wp_generate_uuid4()
+		);
+
+		self::assertInstanceOf( WP_Error::class, $failed_reservation );
+		self::assertSame( 'galaxyone_delivery_capacity_changed', $failed_reservation->get_error_code() );
+		self::assertSame( 5, $this->get_capacity( $this->future_delivery_date )['reserved_count'] );
+		self::assertSame( 1, $this->get_reservation_count( $this->future_delivery_date ) );
+		self::assertNotContains( $this->slot_key, $this->get_available_slot_keys( $this->future_delivery_date ) );
+		self::assertNotContains( $this->slot_key, $this->get_checkout_slot_keys( $this->future_delivery_date ) );
 	}
 
 	public function test_past_delivery_date_remains_unavailable(): void {
@@ -307,6 +432,129 @@ final class DeliverySlotAvailabilityTest extends IntegrationTestCase {
 		self::assertIsArray( $capacity );
 
 		return $capacity;
+	}
+
+	private function set_capacity( string $delivery_date, int $capacity ): void {
+		self::assertTrue(
+			DeliveryCapacityService::save_capacity(
+				$delivery_date,
+				$this->slot_key,
+				$capacity
+			)
+		);
+	}
+
+	private function delete_capacity( string $delivery_date ): void {
+		global $wpdb;
+
+		self::assertSame(
+			1,
+			$wpdb->delete(
+				CreateDeliveryCapacityTable::get_table_name(),
+				array(
+					'delivery_date' => $delivery_date,
+					'slot_key'      => $this->slot_key,
+				),
+				array( '%s', '%s' )
+			)
+		);
+	}
+
+	private function set_reserved_count( string $delivery_date, int $reserved_count ): void {
+		global $wpdb;
+
+		self::assertSame(
+			1,
+			$wpdb->update(
+				CreateDeliveryCapacityTable::get_table_name(),
+				array( 'reserved_count' => $reserved_count ),
+				array(
+					'delivery_date' => $delivery_date,
+					'slot_key'      => $this->slot_key,
+				),
+				array( '%d' ),
+				array( '%s', '%s' )
+			)
+		);
+	}
+
+	private function create_reservation( string $delivery_date ): void {
+		$reservation = DeliveryReservationService::create(
+			$delivery_date,
+			$this->slot_key,
+			1,
+			0,
+			wp_generate_uuid4()
+		);
+
+		self::assertIsArray( $reservation );
+	}
+
+	/**
+	 * @return array<int, string>
+	 */
+	private function get_available_slot_keys( string $delivery_date ): array {
+		$slot_keys = array();
+
+		foreach ( DeliverySlotService::get_available_slots( $delivery_date ) as $slot ) {
+			if ( is_object( $slot ) && isset( $slot->rule_key ) && is_scalar( $slot->rule_key ) ) {
+				$slot_keys[] = (string) $slot->rule_key;
+			}
+		}
+
+		return $slot_keys;
+	}
+
+	/**
+	 * @return array<int, string>
+	 */
+	private function get_checkout_slot_keys( string $delivery_date ): array {
+		$method  = new ReflectionMethod( CheckoutModule::class, 'get_delivery_options' );
+		$options = $method->invoke( new CheckoutModule() );
+		$slots   = isset( $options['slots_by_date'][ $delivery_date ] ) && is_array( $options['slots_by_date'][ $delivery_date ] )
+			? $options['slots_by_date'][ $delivery_date ]
+			: array();
+		$slot_keys = array();
+
+		foreach ( $slots as $slot ) {
+			if ( is_object( $slot ) && isset( $slot->rule_key ) && is_scalar( $slot->rule_key ) ) {
+				$slot_keys[] = (string) $slot->rule_key;
+			}
+		}
+
+		return $slot_keys;
+	}
+
+	private function get_capacity_row_count( string $delivery_date ): int {
+		global $wpdb;
+
+		return (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*)
+				FROM %i
+				WHERE delivery_date = %s
+					AND slot_key = %s",
+				CreateDeliveryCapacityTable::get_table_name(),
+				$delivery_date,
+				$this->slot_key
+			)
+		); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery
+	}
+
+	private function get_reservation_count( string $delivery_date ): int {
+		global $wpdb;
+
+		return (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*)
+				FROM %i
+				WHERE delivery_date = %s
+					AND slot_key = %s",
+				CreateDeliveryReservationsTable::get_table_name(),
+				$delivery_date,
+				$this->slot_key
+			)
+		); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery
 	}
 
 	private function release_reservations(): void {
